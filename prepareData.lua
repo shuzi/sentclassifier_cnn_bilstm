@@ -1,6 +1,4 @@
 
-require 'torch'
-require 'nn'
 local stringx = require 'pl.stringx'
 
 init_voc = {}

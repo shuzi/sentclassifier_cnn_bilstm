@@ -1,20 +1,6 @@
 #!/opt/share/torch-7.0/bin/th
-
 require 'rnn'
 dofile('AddConstantNeg.lua')
-
-fbok,_ = pcall(require, 'fbcunn')
-if fbok then
-   require 'fbcunn'
-end
-cudnnok,_ = pcall(require, 'cudnn')
-if cudnnok then
-   require 'cudnn'
-   cudnn.fastest = true
-   cudnn.benchmark = true
-   cudnn.verbose = true
-end
-
 cmd = torch.CmdLine('_')
 cmd:text()
 cmd:text('Options:')
@@ -67,6 +53,25 @@ print(opt)
 --opt.rundir = cmd:string('experiment', opt, {dir=true})
 --paths.mkdir(opt.rundir)
 --cmd:log(opt.rundir .. '/log', params)
+
+if opt.type == 'cuda' then
+  fbok,_ = pcall(require, 'fbcunn')
+  if fbok then
+     require 'fbcunn'
+  end
+
+  cudnnok,_ = pcall(require, 'cudnn')
+  if cudnnok then
+     require 'cudnn'
+     cudnn.fastest = true
+     cudnn.benchmark = true
+     cudnn.verbose = true
+  end
+else
+   fbok = false
+   cudnnok = false
+end
+
 
 if opt.usefbcunn == false then
   fbok = false
@@ -127,7 +132,6 @@ testDataTensor = torch.Tensor()
 testDataTensor_lstm_fwd = torch.Tensor()
 testDataTensor_lstm_bwd = torch.Tensor()
 testDataTensor_y = {}
-
 
 dofile 'prepareData.lua'
 if opt.type == 'cuda' then
