@@ -1,15 +1,9 @@
 dofile('optim-rmsprop-single.lua')
 
 L_cnn = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
-L_lstm_fwd = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
-L_lstm_bwd = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
 L_cnn.weight:sub(2,-1):copy(mapWordIdx2Vector)
-L_lstm_fwd.weight = L_cnn.weight
-L_lstm_fwd.gradWeight = L_cnn.gradWeight
-L_lstm_bwd.weight = L_cnn.weight
-L_lstm_bwd.gradWeight = L_cnn.gradWeight
-LSTM_fwd = nn.Sequencer(nn.FastLSTM(opt.embeddingDim, opt.LSTMhiddenSize):trimZero(1))
-LSTM_bwd = nn.Sequencer(nn.FastLSTM(opt.embeddingDim, opt.LSTMhiddenSize):trimZero(1))
+LSTM_fwd = nn.Sequencer(nn.FastLSTM(opt.numFilters, opt.LSTMhiddenSize):trimZero(1))
+LSTM_bwd = nn.Sequencer(nn.FastLSTM(opt.numFilters, opt.LSTMhiddenSize):trimZero(1))
 
 cnn = nn.Sequential()
 cnn:add(L_cnn)
@@ -28,14 +22,8 @@ else
    conv = nn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 end
 cnn:add(conv)
-cnn:add(nn.AddConstantNeg(-20000))
-cnn:add(nn.Max(2))
-cnn:add(nn.Tanh())
-cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))
-cnn:add(nn.Tanh())
 
 rnn_fwd = nn.Sequential()
-rnn_fwd:add(L_lstm_fwd)
 if opt.dropout > 0 then
   rnn_fwd:add(nn.Dropout(opt.dropout))
 end
@@ -51,31 +39,30 @@ elseif opt.LSTMmode == 2 then
   rnn_fwd:add(nn.AddConstantNeg(-20000))
   rnn_fwd:add(nn.Max(2))
 elseif opt.LSTMmode == 3 then
-  lstm_fwd = nn.SeqLSTM(opt.embeddingDim, opt.LSTMhiddenSize)
+  lstm_fwd = nn.SeqLSTM(opt.numFilters, opt.LSTMhiddenSize)
   lstm_fwd.batchfirst = true
   lstm_fwd.maskzero = true
   rnn_fwd:add(lstm_fwd)
   rnn_fwd:add(nn.AddConstantNeg(-20000))
   rnn_fwd:add(nn.Max(2))
 elseif opt.LSTMmode == 4 then
-  lstm_fwd = nn.SeqLSTM(opt.embeddingDim, opt.LSTMhiddenSize)
+  lstm_fwd = nn.SeqLSTM(opt.numFilters, opt.LSTMhiddenSize)
   lstm_fwd.batchfirst = true
   lstm_fwd.maskzero = true
   rnn_fwd:add(lstm_fwd)
   rnn_fwd:add(nn.Select(2,-1))
 elseif opt.LSTMmode == 5 then
-  lstm_fwd = cudnn.LSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true)
+  lstm_fwd = cudnn.LSTM(opt.numFilters, opt.LSTMhiddenSize, 1, true)
   rnn_fwd:add(lstm_fwd)
   rnn_fwd:add(nn.AddConstantNeg(-20000))
   rnn_fwd:add(nn.Max(2))
 elseif opt.LSTMmode == 6 then
-  lstm_fwd = cudnn.LSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true)
+  lstm_fwd = cudnn.LSTM(opt.numFilters, opt.LSTMhiddenSize, 1, true)
   rnn_fwd:add(lstm_fwd)
   rnn_fwd:add(nn.Select(2,-1))
 end
 
 rnn_bwd = nn.Sequential()
-rnn_bwd:add(L_lstm_bwd)
 if opt.dropout > 0 then
   rnn_bwd:add(nn.Dropout(opt.dropout))
 end
@@ -91,46 +78,48 @@ elseif opt.LSTMmode == 2 then
   rnn_bwd:add(nn.AddConstantNeg(-20000))
   rnn_bwd:add(nn.Max(2))
 elseif opt.LSTMmode == 3 then
-  lstm_bwd = nn.SeqLSTM(opt.embeddingDim, opt.LSTMhiddenSize)
+  lstm_bwd = nn.SeqLSTM(opt.numFilters, opt.LSTMhiddenSize)
   lstm_bwd.batchfirst = true
   lstm_bwd.maskzero = true
   rnn_bwd:add(lstm_bwd)
   rnn_bwd:add(nn.AddConstantNeg(-20000))
   rnn_bwd:add(nn.Max(2))
 elseif opt.LSTMmode == 4 then
-  lstm_bwd = nn.SeqLSTM(opt.embeddingDim, opt.LSTMhiddenSize)
+  lstm_bwd = nn.SeqLSTM(opt.numFilters, opt.LSTMhiddenSize)
   lstm_bwd.batchfirst = true
   lstm_bwd.maskzero = true
   rnn_bwd:add(lstm_bwd)
   rnn_bwd:add(nn.Select(2,-1))
 elseif opt.LSTMmode == 5 then
-  lstm_bwd = cudnn.LSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true)
+  lstm_bwd = cudnn.LSTM(opt.numFilters, opt.LSTMhiddenSize, 1, true)
   rnn_bwd:add(lstm_bwd)
   rnn_bwd:add(nn.AddConstantNeg(-20000))
   rnn_bwd:add(nn.Max(2))
 elseif opt.LSTMmode == 6 then
-  lstm_bwd = cudnn.LSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true)
+  lstm_bwd = cudnn.LSTM(opt.numFilters, opt.LSTMhiddenSize, 1, true)
   rnn_bwd:add(lstm_bwd)
   rnn_bwd:add(nn.Select(2,-1))
 end
 
-cnn_bilstm = nn.ParallelTable()
+
 if opt.LSTMmode == 7 then
   bilstm = nn.Sequential()
-  bilstm:add(L_lstm_fwd)
-  bilstm:add(cudnn.BLSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true))
+  bilstm:add(cudnn.BLSTM(opt.numFilters, opt.LSTMhiddenSize, 1, true))
   bilstm:add(nn.AddConstantNeg(-20000))
   bilstm:add(nn.Max(2))
-  cnn_bilstm:add(cnn):add(bilstm)
 else
-  cnn_bilstm:add(cnn):add(rnn_fwd):add(rnn_bwd)
+  bilstm = nn.ConcatTable()
+  bilstm:add(rnn_fwd):add(rnn_bwd)
 end
 model = nn.Sequential()
-model:add(cnn_bilstm)
-model:add(nn.JoinTable(2))
+model:add(cnn)
+model:add(bilstm)
+if opt.LSTMmode ~= 7 then
+   model:add(nn.JoinTable(2))
+end
 --model:add(nn.Dropout(0.5))
 --model:add(cudnn.BatchNormalization(opt.hiddenDim + 2*opt.LSTMhiddenSize))
-model:add(nn.Linear(opt.hiddenDim + 2*opt.LSTMhiddenSize, opt.numLabels))
+model:add(nn.Linear(2*opt.LSTMhiddenSize, opt.numLabels))
 model:add(nn.LogSoftMax())
 
 
@@ -235,15 +224,15 @@ function train()
             gradParameters:zero()
             local f = 0
             if opt.LSTMmode == 7 then
-               local output = model:forward{input, input_lstm_fwd}
+               local output = model:forward(input)
                f = criterion:forward(output, target)
                local df_do = criterion:backward(output, target)
-               model:backward({input, input_lstm_fwd}, df_do)
+               model:backward(input, df_do)
             else
-               local output = model:forward{input, input_lstm_fwd, input_lstm_bwd}
+               local output = model:forward(input)
                f = criterion:forward(output, target)
                local df_do = criterion:backward(output, target)
-               model:backward({input, input_lstm_fwd, input_lstm_bwd}, df_do) 
+               model:backward(input, df_do)
             end
             --cutorch.synchronize()
             if opt.L1reg ~= 0 then
@@ -290,9 +279,9 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
         local input_lstm_bwd = inputDataTensor_lstm_bwd:narrow(1, begin , bs)
         local pred        
         if opt.LSTMmode == 7 then
-           pred = model:forward{input, input_lstm_fwd}
+           pred = model:forward(input)
         else
-           pred = model:forward{input, input_lstm_fwd, input_lstm_bwd}
+           pred = model:forward(input)
         end
         local prob, pos = torch.max(pred, 2)
         for m = 1,bs do
@@ -324,9 +313,9 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
        input_lstm_bwd:narrow(1,1,rest_size):copy(inputDataTensor_lstm_bwd:narrow(1, curr*bs + 1, rest_size))
        local pred
        if opt.LSTMmode == 7 then
-           pred = model:forward{input, input_lstm_fwd}
+           pred = model:forward(input)
        else
-           pred = model:forward{input, input_lstm_fwd, input_lstm_bwd}
+           pred = model:forward(input)
        end
        local prob, pos = torch.max(pred, 2)
        for m = 1,rest_size do

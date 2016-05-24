@@ -47,6 +47,8 @@ cmd:option('-saveMode', 'last', 'last|every')
 cmd:option('-LSTMhiddenSize', 200, 'lstm hidden state size')
 cmd:option('-LSTMmode', 4, 'lstm mode, 4: cudnn and using last state')
 cmd:option('-dropout', 0, 'dropout probability')
+cmd:option('-model', 1, 'used model')
+
 cmd:text()
 opt = cmd:parse(arg or {})
 print(opt)
@@ -146,7 +148,16 @@ if opt.type == 'cuda' then
   validDataTensor = validDataTensor:cuda()
   testDataTensor = testDataTensor:cuda()
 end
-dofile 'model_parallel_cnn_bilstm.lua'
+
+if opt.model == 1 then
+   dofile 'model_parallel_cnn_bilstm.lua'
+elseif opt.model == 2 then
+   dofile 'model_bilstm.lua'
+elseif opt.model == 3 then
+   dofile 'model_stack_cnn_bilstm.lua'
+elseif opt.model == 4 then
+   dofile 'model_stack_bilstm_cnn.lua'
+end
 collectgarbage()
 collectgarbage()
 
