@@ -1,1 +1,2 @@
-CUDA_VISIBLE_DEVICES=0 OMP_NUM_THREADS=1 ~/torch_openmpi/install/bin/th cnn.lua -batchSize 200 -type cuda -batchSizeTest 500 -trainFile ~/yelp/train_500k -validFile ~/yelp/valid_2000 -testFile ~/yelp/test_2000 -embeddingFile ~/yelp/filtered.vectors100.txt -numLabels 5 -trainMaxLength 150 -testMaxLength 300
+
+CUDA_VISIBLE_DEVICES=1 OMP_NUM_THREADS=1 th train.lua -type cuda -trainFile ../NLC_data/jewel_train -validFile ../NLC_data/jewel_valid -testFile ../NLC_data/jewel_test -embeddingFile ../NLC_data/embedding -numLabels 311 -epoch 100 -batchSize 1 -batchSizeTest 5 -learningRate 0.02 -numFilters 1000 -hiddenDim 1000 -wordHiddenDim 100 -LSTMmode 5 -model 3 -LSTMhiddenSize 500 -lastReLU
