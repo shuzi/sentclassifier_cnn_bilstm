@@ -22,6 +22,11 @@ else
    conv = nn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 end
 cnn:add(conv)
+if opt.lastReLU then
+  cnn:add(nn.ReLU())
+else
+  cnn:add(nn.Tanh())
+end
 
 rnn_fwd = nn.Sequential()
 if opt.dropout > 0 then

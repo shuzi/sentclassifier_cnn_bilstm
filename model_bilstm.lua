@@ -105,6 +105,11 @@ end
 
 --model:add(nn.Dropout(0.5))
 --model:add(cudnn.BatchNormalization(opt.hiddenDim + 2*opt.LSTMhiddenSize))
+if opt.lastReLU then
+  model:add(nn.ReLU())
+else
+  model:add(nn.Tanh())
+end
 model:add(nn.Linear(2*opt.LSTMhiddenSize, opt.numLabels))
 model:add(nn.LogSoftMax())
 

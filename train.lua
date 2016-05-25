@@ -48,6 +48,7 @@ cmd:option('-LSTMhiddenSize', 200, 'lstm hidden state size')
 cmd:option('-LSTMmode', 4, 'lstm mode, 4: cudnn and using last state')
 cmd:option('-dropout', 0, 'dropout probability')
 cmd:option('-model', 1, 'used model')
+cmd:option('-lastReLU', false, 'use ReLU at last layer')
 
 cmd:text()
 opt = cmd:parse(arg or {})
@@ -157,6 +158,8 @@ elseif opt.model == 3 then
    dofile 'model_stack_cnn_bilstm.lua'
 elseif opt.model == 4 then
    dofile 'model_stack_bilstm_cnn.lua'
+elseif opt.model == 5 then
+   dofile 'model_cnn.lua'
 end
 collectgarbage()
 collectgarbage()

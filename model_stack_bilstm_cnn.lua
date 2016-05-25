@@ -99,7 +99,11 @@ cnn:add(nn.AddConstantNeg(-20000))
 cnn:add(nn.Max(2))
 cnn:add(nn.Tanh())
 cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))
-cnn:add(nn.Tanh())
+if opt.lastReLU then
+  cnn:add(nn.ReLU())
+else
+  cnn:add(nn.Tanh())
+end
 
 
 model = nn.Sequential()
