@@ -3,8 +3,8 @@ dofile('optim-rmsprop-single.lua')
 L_rnn_fwd = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
 L_rnn_bwd = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
 L_rnn_fwd.weight:sub(2,-1):copy(mapWordIdx2Vector)
-L_rnn_bwd.weight = L_lstm_fwd.weight
-L_rnn_bwd.gradWeight = L_lstm_fwd.gradWeight
+L_rnn_bwd.weight = L_rnn_fwd.weight
+L_rnn_bwd.gradWeight = L_rnn_fwd.gradWeight
 
 
 rnn_fwd = nn.Sequential()
