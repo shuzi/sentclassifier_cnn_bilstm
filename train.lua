@@ -45,10 +45,14 @@ cmd:option('-usecudnn', false, 'use cudnn')
 cmd:option('-nesterov', false, 'use nesterov')
 cmd:option('-saveMode', 'last', 'last|every')
 cmd:option('-LSTMhiddenSize', 200, 'lstm hidden state size')
+cmd:option('-RNNhiddenSize', 200, 'rnn hidden state size')
+cmd:option('-GRUhiddenSize', 200, 'gru hidden state size')
 cmd:option('-LSTMmode', 4, 'lstm mode, 4: cudnn and using last state')
 cmd:option('-dropout', 0, 'dropout probability')
 cmd:option('-model', 1, 'used model')
 cmd:option('-lastReLU', false, 'use ReLU at last layer')
+cmd:option('-rnnReLU', false, 'use ReLU for rnn')
+cmd:option('-rnnTanh', false, 'use Tanh for rnn')
 
 cmd:text()
 opt = cmd:parse(arg or {})
@@ -160,6 +164,10 @@ elseif opt.model == 4 then
    dofile 'model_stack_bilstm_cnn.lua'
 elseif opt.model == 5 then
    dofile 'model_cnn.lua'
+elseif opt.model == 6 then
+   dofile 'model_birnn.lua'
+elseif opt.model == 7 then
+   dofile 'model_bigru.lua'
 end
 collectgarbage()
 collectgarbage()
