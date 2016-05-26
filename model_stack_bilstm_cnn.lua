@@ -116,7 +116,19 @@ model:add(cnn)
 model:add(nn.Linear(opt.hiddenDim, opt.numLabels))
 model:add(nn.LogSoftMax())
 
-criterion = nn.ClassNLLCriterion()
+if opt.twoCriterion then
+  prob_idx = nn.ConcatTable()
+  prob_idx:add(nn.Identity())
+  prob_idx:add(nn.ArgMax(2,opt.numLabels, false))
+  model:add(prob_idx)
+
+  nll = nn.ClassNLLCriterion()
+  abs = nn.AbsCriterion()
+  criterion = nn.ParallelCriterion(true):add(nll, opt.criterionWeight):add(abs)
+else
+  criterion = nn.ClassNLLCriterion()
+end
+
 
 if opt.type == 'cuda' then
    model:cuda()

@@ -10,7 +10,6 @@ batchSizeTest=5
 learningRate=0.02
 numFilters=1000
 hiddenDim=1000
-model=7
 RNNhiddenSize=500
 LSTMhiddenSize=500
 GRUhiddenSize=500
