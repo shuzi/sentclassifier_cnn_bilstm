@@ -205,6 +205,7 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
     local bs = opt.batchSizeTest
     local batches = inputDataTensor:size()[1]/bs
     local correct = 0
+    local correct2 = 0
     local curr = -1
     for t = 1,batches,1 do
         curr = t
@@ -219,12 +220,24 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
         else 
            pred = model:forward{input, input_lstm_fwd, input_lstm_bwd}
         end
-        local prob, pos = torch.max(pred, 2)
+        
+        local prob, pos
+        if opt.twoCriterion then
+           prob, pos = torch.max(pred[1], 2)
+        else
+           prob, pos = torch.max(pred, 2)
+        end
         for m = 1,bs do
-           for k,v in ipairs(inputTarget[begin+m-1]) do
+          for k,v in ipairs(inputTarget[begin+m-1]) do
             if pos[m][1] == v then
                 correct = correct + 1
                 break
+            end
+          end
+          for k,v in ipairs(inputTarget[begin+m-1]) do
+            if torch.abs(pos[m][1] - v) < 2 then
+              correct2 = correct2 + 1
+              break
             end
           end 
         end     
@@ -254,11 +267,22 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
            pred = model:forward{input, input_lstm_fwd, input_lstm_bwd}
        end
 
-       local prob, pos = torch.max(pred, 2)
+       local prob, pos 
+       if opt.twoCriterion then
+           prob, pos = torch.max(pred[1], 2)
+       else
+           prob, pos = torch.max(pred, 2)
+       end
        for m = 1,rest_size do
-           for k,v in ipairs(inputTarget[curr*bs+m]) do
+          for k,v in ipairs(inputTarget[curr*bs+m]) do
             if pos[m][1] == v then
                 correct = correct + 1
+                break
+            end
+          end
+          for k,v in ipairs(inputTarget[curr*bs+m]) do
+            if torch.abs(pos[m][1] - v) < 2 then
+                correct2 = correct2 + 1
                 break
             end
           end
@@ -267,8 +291,13 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
      
     state.bestAccuracy = state.bestAccuracy or 0
     state.bestEpoch = state.bestEpoch or 0
+    state.bestAccuracy2 = state.bestAccuracy2 or 0
+    state.bestEpoch2 = state.bestEpoch2 or 0
     local currAccuracy = correct/(inputDataTensor:size()[1])
+    local currAccuracy2 = correct2/(inputDataTensor:size()[1])
     if currAccuracy > state.bestAccuracy then state.bestAccuracy = currAccuracy; state.bestEpoch = epoch end
+    if currAccuracy2 > state.bestAccuracy2 then state.bestAccuracy2 = currAccuracy2; state.bestEpoch2 = epoch end
     print(string.format("Epoch %s Accuracy: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy, state.bestAccuracy, state.bestEpoch, sys.toc() ))
+    print(string.format("Epoch %s Accuracy2: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy2, state.bestAccuracy2, state.bestEpoch2, sys.toc() ))
 end
 

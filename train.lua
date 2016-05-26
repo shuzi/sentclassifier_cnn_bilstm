@@ -1,6 +1,7 @@
 #!/opt/share/torch-7.0/bin/th
 require 'rnn'
 dofile('AddConstantNeg.lua')
+--dofile('ArgMax.lua')
 dofile('options.lua')
 
 local stringx = require 'pl.stringx'

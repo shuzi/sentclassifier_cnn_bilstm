@@ -41,8 +41,18 @@ end
 model:add(nn.Linear(2*opt.GRUhiddenSize, opt.numLabels))
 model:add(nn.LogSoftMax())
 
+if opt.twoCriterion then
+  prob_idx = nn.ConcatTable()
+  prob_idx:add(nn.Identity())
+  prob_idx:add(nn.ArgMax(2,opt.numLabels, false))
+  model:add(prob_idx)
 
-criterion = nn.ClassNLLCriterion()
+  nll = nn.ClassNLLCriterion()
+  abs = nn.AbsCriterion()
+  criterion = nn.ParallelCriterion(true):add(nll, opt.criterionWeight):add(abs)
+else
+  criterion = nn.ClassNLLCriterion()
+end
 
 if opt.type == 'cuda' then
    model:cuda()
@@ -142,17 +152,10 @@ function train()
             end
             gradParameters:zero()
             local f = 0
-            if opt.LSTMmode == 7 then
-               local output = model:forward(input_lstm_fwd)
-               f = criterion:forward(output, target)
-               local df_do = criterion:backward(output, target)
-               model:backward(input_lstm_fwd, df_do)
-            else 
-               local output = model:forward{input, input_lstm_fwd, input_lstm_bwd}
-               f = criterion:forward(output, target)
-               local df_do = criterion:backward(output, target)
-               model:backward({input, input_lstm_fwd, input_lstm_bwd}, df_do) 
-            end
+            local output = model:forward{input, input_lstm_fwd, input_lstm_bwd}
+            f = criterion:forward(output, target)
+            local df_do = criterion:backward(output, target)
+            model:backward({input, input_lstm_fwd, input_lstm_bwd}, df_do) 
             --cutorch.synchronize()
             if opt.L1reg ~= 0 then
                local norm, sign = torch.norm, torch.sign
@@ -189,6 +192,7 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
     local bs = opt.batchSizeTest
     local batches = inputDataTensor:size()[1]/bs
     local correct = 0
+    local correct2 = 0
     local curr = -1
     for t = 1,batches,1 do
         curr = t
@@ -196,22 +200,28 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
         local input = inputDataTensor:narrow(1, begin , bs)
         local input_lstm_fwd = inputDataTensor_lstm_fwd:narrow(1, begin , bs)
         local input_lstm_bwd = inputDataTensor_lstm_bwd:narrow(1, begin , bs)
-
         local pred
-        if opt.LSTMmode == 7 then
-           pred = model:forward(input_lstm_fwd)
-        else 
-           pred = model:forward{input, input_lstm_fwd, input_lstm_bwd}
+        pred = model:forward{input, input_lstm_fwd, input_lstm_bwd}
+        local prob, pos
+        if opt.twoCriterion then
+           prob, pos = torch.max(pred[1], 2)
+        else
+           prob, pos = torch.max(pred, 2)
         end
-        local prob, pos = torch.max(pred, 2)
         for m = 1,bs do
-           for k,v in ipairs(inputTarget[begin+m-1]) do
+          for k,v in ipairs(inputTarget[begin+m-1]) do
             if pos[m][1] == v then
                 correct = correct + 1
                 break
             end
-          end 
-        end     
+          end      
+          for k,v in ipairs(inputTarget[begin+m-1]) do
+            if torch.abs(pos[m][1] - v) < 2 then
+              correct2 = correct2 + 1
+              break
+            end
+          end
+        end
     end
 
     local rest_size = inputDataTensor:size()[1] - curr * bs
@@ -232,17 +242,23 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
        input_lstm_fwd:narrow(1,1,rest_size):copy(inputDataTensor_lstm_fwd:narrow(1, curr*bs + 1, rest_size))
        input_lstm_bwd:narrow(1,1,rest_size):copy(inputDataTensor_lstm_bwd:narrow(1, curr*bs + 1, rest_size))
        local pred
-       if opt.LSTMmode == 7 then
-           pred = model:forward(input_lstm_fwd)
+       pred = model:forward{input, input_lstm_fwd, input_lstm_bwd}
+       local prob, pos 
+       if opt.twoCriterion then
+           prob, pos = torch.max(pred[1], 2)
        else
-           pred = model:forward{input, input_lstm_fwd, input_lstm_bwd}
+           prob, pos = torch.max(pred, 2)
        end
-
-       local prob, pos = torch.max(pred, 2)
        for m = 1,rest_size do
-           for k,v in ipairs(inputTarget[curr*bs+m]) do
+          for k,v in ipairs(inputTarget[curr*bs+m]) do
             if pos[m][1] == v then
                 correct = correct + 1
+                break
+            end
+          end
+          for k,v in ipairs(inputTarget[curr*bs+m]) do
+            if torch.abs(pos[m][1] - v) < 2 then
+                correct2 = correct2 + 1
                 break
             end
           end
@@ -251,8 +267,13 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
      
     state.bestAccuracy = state.bestAccuracy or 0
     state.bestEpoch = state.bestEpoch or 0
+    state.bestAccuracy2 = state.bestAccuracy2 or 0
+    state.bestEpoch2 = state.bestEpoch2 or 0
     local currAccuracy = correct/(inputDataTensor:size()[1])
+    local currAccuracy2 = correct2/(inputDataTensor:size()[1])
     if currAccuracy > state.bestAccuracy then state.bestAccuracy = currAccuracy; state.bestEpoch = epoch end
-    print(string.format("Epoch %s Accuracy: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy, state.bestAccuracy, state.bestEpoch, sys.toc() ))
+    if currAccuracy2 > state.bestAccuracy2 then state.bestAccuracy2 = currAccuracy2; state.bestEpoch2 = epoch end
+    print(string.format("Epoch %s Accuracy: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy, state.bestAccuracy, state.bestEpoch, sys.toc()))
+    print(string.format("Epoch %s Accuracy2: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy2, state.bestAccuracy2, state.bestEpoch2, sys.toc() ))
 end
 
