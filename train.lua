@@ -56,6 +56,25 @@ cmd:option('-rnnTanh', false, 'use Tanh for rnn')
 
 cmd:text()
 opt = cmd:parse(arg or {})
+
+local stringx = require 'pl.stringx'
+if io.open("configure", "r") then
+   for line in io.lines("configure") do
+      local option = stringx.split(line, '=')
+      if type(opt[option[1]]) == 'number' then
+         opt[option[1]] = tonumber(option[2])
+      elseif type(opt[option[1]]) == 'boolean' then
+         if option[2] == "true" then
+            opt[option[1]] = true
+         elseif option[2] == "false" then
+            opt[option[1]] = false
+         end
+      elseif type(opt[option[1]]) == 'string' then
+         opt[option[1]] = option[2]
+      end
+   end
+end
+
 print(opt)
 --opt.rundir = cmd:string('experiment', opt, {dir=true})
 --paths.mkdir(opt.rundir)
