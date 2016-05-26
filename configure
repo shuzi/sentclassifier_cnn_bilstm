@@ -1,2 +1,3 @@
 rnnReLU=true
 LSTMmode=400
+modelSize=1103611

@@ -4,6 +4,21 @@ dofile('AddConstantNeg.lua')
 dofile('options.lua')
 
 local stringx = require 'pl.stringx'
+local optmap = {}
+for line in io.lines("configure") do
+   local option = stringx.split(line, '=')
+   if option[1] == "modelSize" then
+      print("Delete previous modelSize!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+   else
+      optmap[option[1]] = option[2]
+   end
+end
+fp = io.open("configure", "w+" )
+for k,v in pairs(optmap) do
+   fp:write(string.format("%s=%s\n", k,v ))
+end
+fp:close()
+
 if io.open("configure", "r") then
    for line in io.lines("configure") do
       local option = stringx.split(line, '=')
@@ -136,37 +151,10 @@ elseif opt.model == 7 then
 end
 collectgarbage()
 collectgarbage()
+modelSize=parameters:size()[1]
 
+fp = io.open("configure", "a+" )
+fp:write(string.format("modelSize=%s\n", modelSize))
+fp:close()
 
-sys.tic()
-epoch = 1
-validState = {}
-testState = {}
-while epoch <= opt.epoch do
-   train()
-   test(validDataTensor, validDataTensor_lstm_fwd, validDataTensor_lstm_bwd, validDataTensor_y, validState)
-   test(testDataTensor, testDataTensor_lstm_fwd, testDataTensor_lstm_bwd, testDataTensor_y, testState)
-   if opt.outputprefix ~= 'none' then
-      if opt.saveMode == 'last' and epoch == opt.epoch then
-         local t = sys.toc()
-         saveModel(t + opt.prevtime)
-         local obj = {
-            em = model:get(1).weight,
-            s2i = mapWordStr2WordIdx,
-            i2s = mapWordIdx2WordStr
-         }
-         torch.save(opt.outputprefix .. string.format("_%010.2f_embedding", t + opt.prevtime), obj)
-      elseif opt.saveMode == 'every'  then
-         local t = sys.toc()
-         saveModel(t + opt.prevtime)
-         local obj = {
-            em = model:get(1).weight,
-            s2i = mapWordStr2WordIdx,
-            i2s = mapWordIdx2WordStr
-         }
-         torch.save(opt.outputprefix .. string.format("_%010.2f_embedding", t + opt.prevtime), obj)
-      end
-   end
-   epoch = epoch + 1
-end
 
