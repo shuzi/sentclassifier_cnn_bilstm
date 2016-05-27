@@ -18,6 +18,7 @@ skip['ockfree']=true
 skip['psAddLevel']=true
 skip['numEpochs']=true
 skip['mbSize']=true
+skip['totalUpdateTimes']=true
 
 for line in io.lines("configure") do
    local option = stringx.split(line, '=')
