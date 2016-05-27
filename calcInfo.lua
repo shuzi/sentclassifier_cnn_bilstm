@@ -5,12 +5,24 @@ dofile('options.lua')
 
 local stringx = require 'pl.stringx'
 local optmap = {}
+local skip = {}
+
+skip["modelSize"]=true
+skip['modelElemNum']=true
+skip['onGPU']=true
+skip['testOnGPU']=true
+skip['testFreq']=true
+skip['psOmpThdNum']=true
+skip['optLevel']=true
+skip['ockfree']=true
+skip['psAddLevel']=true
+skip['numEpochs']=true
+skip['mbSize']=true
+
 for line in io.lines("configure") do
    local option = stringx.split(line, '=')
-   if option[1] == "modelSize" then
-      print("Delete previous modelSize!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-   elseif option[1] == "totalUpdateTimes" then
-      print("Delete previous totalUpdateTimes!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+   if skip[option[1]] then
+      print("Delete previous " .. option[1]  .. "  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
    else
       optmap[option[1]] = option[2]
    end
@@ -153,11 +165,32 @@ elseif opt.model == 7 then
 end
 collectgarbage()
 collectgarbage()
-modelSize = parameters:size()[1]
+modelSize = 4*parameters:size()[1]
+modelElemNum = parameters:size()[1]
+onGPU=1
+testOnGPU=1
+testFreq=1
+psOmpThdNum=4
+optLevel=2
+lockfree=true
+psAddLevel=0
+numEpochs=opt.epoch
+mbSize=opt.batchSize
 totalUpdateTimes = (trainDataTensor:size()[1]/opt.batchSize) * opt.epoch
 fp = io.open("configure", "a+" )
 fp:write(string.format("modelSize=%s\n", modelSize))
+fp:write(string.format("modelElemNum=%s\n", modelElemNum))
+fp:write(string.format("onGPU=%s\n", onGPU))
+fp:write(string.format("testOnGPU=%s\n", testOnGPU))
+fp:write(string.format("testFreq=%s\n", testFreq))
+fp:write(string.format("psOmpThdNum=%s\n", psOmpThdNum))
+fp:write(string.format("optLevel=%s\n", optLevel))
+fp:write(string.format("lockfree=%s\n", lockfree))
+fp:write(string.format("psAddLevel=%s\n", psAddLevel))
+fp:write(string.format("numEpochs=%s\n", numEpochs))
+fp:write(string.format("mbSize=%s\n", mbSize))
 fp:write(string.format("totalUpdateTimes=%s\n", totalUpdateTimes))
-fp:close()
 
+
+fp:close()
 
