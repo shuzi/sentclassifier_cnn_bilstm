@@ -59,7 +59,7 @@ elseif opt.LSTMmode == 4 then
 elseif opt.LSTMmode == 5 then
   lstm_fwd = cudnn.LSTM(opt.numFilters, opt.LSTMhiddenSize, 1, true)
   rnn_fwd:add(lstm_fwd)
-  rnn_fwd:add(nn.AddConstantNeg(-20000))
+  --rnn_fwd:add(nn.AddConstantNeg(-20000))
   rnn_fwd:add(nn.Max(2))
 elseif opt.LSTMmode == 6 then
   lstm_fwd = cudnn.LSTM(opt.numFilters, opt.LSTMhiddenSize, 1, true)
@@ -98,7 +98,7 @@ elseif opt.LSTMmode == 4 then
 elseif opt.LSTMmode == 5 then
   lstm_bwd = cudnn.LSTM(opt.numFilters, opt.LSTMhiddenSize, 1, true)
   rnn_bwd:add(lstm_bwd)
-  rnn_bwd:add(nn.AddConstantNeg(-20000))
+--  rnn_bwd:add(nn.AddConstantNeg(-20000))
   rnn_bwd:add(nn.Max(2))
 elseif opt.LSTMmode == 6 then
   lstm_bwd = cudnn.LSTM(opt.numFilters, opt.LSTMhiddenSize, 1, true)

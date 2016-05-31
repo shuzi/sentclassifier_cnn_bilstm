@@ -152,10 +152,10 @@ function train()
             end
             gradParameters:zero()
             local f = 0
-            local output = model:forward{input, input_lstm_fwd, input_lstm_bwd}
+            local output = model:forward{input_lstm_fwd, input_lstm_bwd}
             f = criterion:forward(output, target)
             local df_do = criterion:backward(output, target)
-            model:backward({input, input_lstm_fwd, input_lstm_bwd}, df_do) 
+            model:backward({input_lstm_fwd, input_lstm_bwd}, df_do) 
             --cutorch.synchronize()
             if opt.L1reg ~= 0 then
                local norm, sign = torch.norm, torch.sign
@@ -201,7 +201,7 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
         local input_lstm_fwd = inputDataTensor_lstm_fwd:narrow(1, begin , bs)
         local input_lstm_bwd = inputDataTensor_lstm_bwd:narrow(1, begin , bs)
         local pred
-        pred = model:forward{input, input_lstm_fwd, input_lstm_bwd}
+        pred = model:forward{input_lstm_fwd, input_lstm_bwd}
         local prob, pos
         if opt.twoCriterion then
            prob, pos = torch.max(pred[1], 2)
@@ -242,7 +242,7 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
        input_lstm_fwd:narrow(1,1,rest_size):copy(inputDataTensor_lstm_fwd:narrow(1, curr*bs + 1, rest_size))
        input_lstm_bwd:narrow(1,1,rest_size):copy(inputDataTensor_lstm_bwd:narrow(1, curr*bs + 1, rest_size))
        local pred
-       pred = model:forward{input, input_lstm_fwd, input_lstm_bwd}
+       pred = model:forward{input_lstm_fwd, input_lstm_bwd}
        local prob, pos 
        if opt.twoCriterion then
            prob, pos = torch.max(pred[1], 2)

@@ -175,10 +175,10 @@ function train()
                local df_do = criterion:backward(output, target)
                model:backward(input_lstm_fwd, df_do)
             else 
-               local output = model:forward{input, input_lstm_fwd, input_lstm_bwd}
+               local output = model:forward{input_lstm_fwd, input_lstm_bwd}
                f = criterion:forward(output, target)
                local df_do = criterion:backward(output, target)
-               model:backward({input, input_lstm_fwd, input_lstm_bwd}, df_do) 
+               model:backward({input_lstm_fwd, input_lstm_bwd}, df_do) 
             end
             --cutorch.synchronize()
             if opt.L1reg ~= 0 then
@@ -229,7 +229,7 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
         if opt.LSTMmode == 7 then
            pred = model:forward(input_lstm_fwd)
         else 
-           pred = model:forward{input, input_lstm_fwd, input_lstm_bwd}
+           pred = model:forward{input_lstm_fwd, input_lstm_bwd}
         end
         
         local prob, pos
@@ -275,7 +275,7 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
        if opt.LSTMmode == 7 then
            pred = model:forward(input_lstm_fwd)
        else
-           pred = model:forward{input, input_lstm_fwd, input_lstm_bwd}
+           pred = model:forward{input_lstm_fwd, input_lstm_bwd}
        end
 
        local prob, pos 

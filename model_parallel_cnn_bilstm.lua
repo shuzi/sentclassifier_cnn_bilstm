@@ -28,7 +28,7 @@ else
    conv = nn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 end
 cnn:add(conv)
-cnn:add(nn.AddConstantNeg(-20000))
+--cnn:add(nn.AddConstantNeg(-20000))
 cnn:add(nn.Max(2))
 cnn:add(nn.Tanh())
 cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))

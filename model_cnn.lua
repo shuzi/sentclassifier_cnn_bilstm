@@ -8,10 +8,6 @@ cnn:add(L_cnn)
 if opt.dropout > 0 then
    cnn:add(nn.Dropout(opt.dropout))
 end
---cnn:add(nn.View(opt.batchSize*trainDataTensor:size()[2], opt.embeddingDim))
---cnn:add(nn.Linear(opt.embeddingDim, opt.wordHiddenDim))
---cnn:add(nn.View(opt.batchSize, trainDataTensor:size()[2], opt.wordHiddenDim))
---cnn:add(nn.Tanh())
 if cudnnok then
    conv = cudnn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 elseif fbok then
@@ -20,7 +16,7 @@ else
    conv = nn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 end
 cnn:add(conv)
-cnn:add(nn.AddConstantNeg(-20000))
+--cnn:add(nn.AddConstantNeg(-20000))
 cnn:add(nn.Max(2))
 cnn:add(nn.Tanh())
 cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))
