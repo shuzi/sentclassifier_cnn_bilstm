@@ -95,7 +95,9 @@ else
    conv = nn.TemporalConvolution(2*opt.LSTMhiddenSize, opt.numFilters, opt.contConvWidth)
 end
 cnn:add(conv)
---cnn:add(nn.AddConstantNeg(-20000))
+if opt.useACN then
+  cnn:add(nn.AddConstantNeg(-20000))
+end
 cnn:add(nn.Max(2))
 cnn:add(nn.Tanh())
 cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))

@@ -13,7 +13,9 @@ if opt.dropout > 0 then
   rnn_fwd:add(nn.Dropout(opt.dropout))
 end
 rnn_fwd:add(cudnn.GRU(opt.embeddingDim, opt.GRUhiddenSize, 1, true))
-rnn_fwd:add(nn.AddConstantNeg(-20000))
+if opt.useACN then 
+  rnn_fwd:add(nn.AddConstantNeg(-20000))
+end
 rnn_fwd:add(nn.Max(2))
 
 rnn_bwd = nn.Sequential()
@@ -22,7 +24,9 @@ if opt.dropout > 0 then
   rnn_bwd:add(nn.Dropout(opt.dropout))
 end
 rnn_bwd:add(cudnn.GRU(opt.embeddingDim, opt.GRUhiddenSize, 1, true))
-rnn_bwd:add(nn.AddConstantNeg(-20000))
+if opt.useACN then
+  rnn_bwd:add(nn.AddConstantNeg(-20000))
+end
 rnn_bwd:add(nn.Max(2))
 
 model = nn.Sequential()

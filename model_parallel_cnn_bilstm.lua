@@ -28,7 +28,9 @@ else
    conv = nn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 end
 cnn:add(conv)
---cnn:add(nn.AddConstantNeg(-20000))
+if opt.useACN then
+  cnn:add(nn.AddConstantNeg(-20000))
+end
 cnn:add(nn.Max(2))
 cnn:add(nn.Tanh())
 cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))
@@ -70,7 +72,9 @@ elseif opt.LSTMmode == 4 then
 elseif opt.LSTMmode == 5 then
   lstm_fwd = cudnn.LSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true)
   rnn_fwd:add(lstm_fwd)
-  rnn_fwd:add(nn.AddConstantNeg(-20000))
+  if opt.useACN then
+    rnn_fwd:add(nn.AddConstantNeg(-20000))
+  end
   rnn_fwd:add(nn.Max(2))
 elseif opt.LSTMmode == 6 then
   lstm_fwd = cudnn.LSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true)
@@ -110,7 +114,9 @@ elseif opt.LSTMmode == 4 then
 elseif opt.LSTMmode == 5 then
   lstm_bwd = cudnn.LSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true)
   rnn_bwd:add(lstm_bwd)
-  rnn_bwd:add(nn.AddConstantNeg(-20000))
+  if opt.useACN then
+    rnn_bwd:add(nn.AddConstantNeg(-20000))
+  end
   rnn_bwd:add(nn.Max(2))
 elseif opt.LSTMmode == 6 then
   lstm_bwd = cudnn.LSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true)
@@ -123,7 +129,9 @@ if opt.LSTMmode == 7 then
   bilstm = nn.Sequential()
   bilstm:add(L_lstm_fwd)
   bilstm:add(cudnn.BLSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true))
-  bilstm:add(nn.AddConstantNeg(-20000))
+  if opt.useACN then 
+    bilstm:add(nn.AddConstantNeg(-20000))
+  end
   bilstm:add(nn.Max(2))
   cnn_bilstm:add(cnn):add(bilstm)
 else

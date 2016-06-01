@@ -41,7 +41,9 @@ elseif opt.LSTMmode == 4 then
 elseif opt.LSTMmode == 5 then
   lstm_fwd = cudnn.LSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true)
   rnn_fwd:add(lstm_fwd)
-  rnn_fwd:add(nn.AddConstantNeg(-20000))
+  if opt.useACN then
+    rnn_fwd:add(nn.AddConstantNeg(-20000))
+  end
   rnn_fwd:add(nn.Max(2))
 elseif opt.LSTMmode == 6 then
   lstm_fwd = cudnn.LSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true)
@@ -81,7 +83,9 @@ elseif opt.LSTMmode == 4 then
 elseif opt.LSTMmode == 5 then
   lstm_bwd = cudnn.LSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true)
   rnn_bwd:add(lstm_bwd)
-  rnn_bwd:add(nn.AddConstantNeg(-20000))
+  if opt.useACN then
+    rnn_bwd:add(nn.AddConstantNeg(-20000))
+  end
   rnn_bwd:add(nn.Max(2))
 elseif opt.LSTMmode == 6 then
   lstm_bwd = cudnn.LSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true)
@@ -94,7 +98,9 @@ if opt.LSTMmode == 7 then
   bilstm = cudnn.BLSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true)
   model:add(L_lstm_fwd)
   model:add(bilstm)
-  model:add(nn.AddConstantNeg(-20000))
+  if opt.useACN then
+    model:add(nn.AddConstantNeg(-20000))
+  end
   model:add(nn.Max(2))
 else
   bilstm = nn.ParallelTable()

@@ -14,12 +14,16 @@ if opt.dropout > 0 then
 end
 if opt.rnnTanh then
   rnn_fwd:add(cudnn.RNNTanh(opt.embeddingDim, opt.RNNhiddenSize, 1, true))
-  rnn_fwd:add(nn.AddConstantNeg(-20000))
+  if opt.useACN then
+    rnn_fwd:add(nn.AddConstantNeg(-20000))
+  end
   rnn_fwd:add(nn.Max(2))
 end
 if opt.rnnReLU then
   rnn_fwd:add(cudnn.RNNReLU(opt.embeddingDim, opt.RNNhiddenSize, 1, true))
-  rnn_fwd:add(nn.AddConstantNeg(-20000))
+  if opt.useACN then
+    rnn_fwd:add(nn.AddConstantNeg(-20000))
+  end
   rnn_fwd:add(nn.Max(2))
 end
 
@@ -30,12 +34,16 @@ if opt.dropout > 0 then
 end
 if opt.rnnTanh then
   rnn_bwd:add(cudnn.RNNTanh(opt.embeddingDim, opt.RNNhiddenSize, 1, true))
-  rnn_bwd:add(nn.AddConstantNeg(-20000))
+  if opt.useACN then
+    rnn_bwd:add(nn.AddConstantNeg(-20000))
+  end
   rnn_bwd:add(nn.Max(2))
 end
 if opt.rnnReLU then
   rnn_bwd:add(cudnn.RNNReLU(opt.embeddingDim, opt.RNNhiddenSize, 1, true))
-  rnn_bwd:add(nn.AddConstantNeg(-20000))
+  if opt.useACN then
+    rnn_bwd:add(nn.AddConstantNeg(-20000))
+  end
   rnn_bwd:add(nn.Max(2))
 end
 
