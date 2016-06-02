@@ -1,11 +1,16 @@
 dofile('optim-rmsprop-single.lua')
 
-L = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
-L.weight:sub(2,-1):copy(mapWordIdx2Vector)
+L_lstm_fwd = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
+L_lstm_bwd = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
+L_lstm_fwd.weight:sub(2,-1):copy(mapWordIdx2Vector)
+L_lstm_bwd.weight = L_lstm_fwd.weight
+L_lstm_bwd.gradWeight = L_lstm_fwd.gradWeight
+
 LSTM_fwd = nn.Sequencer(nn.FastLSTM(opt.embeddingDim, opt.LSTMhiddenSize):trimZero(1))
 LSTM_bwd = nn.Sequencer(nn.FastLSTM(opt.embeddingDim, opt.LSTMhiddenSize):trimZero(1))
 
 rnn_fwd = nn.Sequential()
+rnn_fwd:add(L_lstm_fwd)
 if opt.dropout > 0 then
   rnn_fwd:add(nn.Dropout(opt.dropout))
 end
@@ -41,6 +46,7 @@ elseif opt.LSTMmode == 6 then
 end
 
 rnn_bwd = nn.Sequential()
+rnn_bwd:add(L_lstm_bwd)
 if opt.dropout > 0 then
   rnn_bwd:add(nn.Dropout(opt.dropout))
 end
@@ -79,7 +85,7 @@ if opt.LSTMmode == 7 then
   bilstm = nn.Sequential()
   bilstm:add(cudnn.BLSTM(opt.embeddingDim, opt.LSTMhiddenSize, 1, true))
 else
-  bilstm = nn.ConcatTable()
+  bilstm = nn.ParallelTable()
   bilstm:add(rnn_fwd):add(rnn_bwd)
 end
 
@@ -109,7 +115,6 @@ end
 
 
 model = nn.Sequential()
-model:add(L)
 model:add(bilstm)
 if opt.LSTMmode ~= 7 then
    model:add(nn.JoinTable(3))
@@ -232,15 +237,15 @@ function train()
             local f = 0
           
             if opt.LSTMmode == 7 then
-               local output = model:forward(input)
+               local output = model:forward(input_lstm_fwd)
                f = criterion:forward(output, target)
                local df_do = criterion:backward(output, target)
-               model:backward(input, df_do)
+               model:backward(input_lstm_fwd, df_do)
             else
-               local output = model:forward(input)
+               local output = model:forward{input_lstm_fwd, input_lstm_bwd}
                f = criterion:forward(output, target)
                local df_do = criterion:backward(output, target)
-               model:backward(input, df_do)
+               model:backward({input_lstm_fwd, input_lstm_bwd}, df_do)
             end
             --cutorch.synchronize()
             if opt.L1reg ~= 0 then
@@ -288,9 +293,9 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
         local input_lstm_bwd = inputDataTensor_lstm_bwd:narrow(1, begin , bs)
         local pred        
         if opt.LSTMmode == 7 then
-           pred = model:forward(input)
+           pred = model:forward(input_lstm_fwd)
         else
-           pred = model:forward(input)
+           pred = model:forward{input_lstm_fwd, input_lstm_bwd}
         end
         
         local prob, pos
@@ -334,9 +339,9 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
        input_lstm_bwd:narrow(1,1,rest_size):copy(inputDataTensor_lstm_bwd:narrow(1, curr*bs + 1, rest_size))
        local pred
        if opt.LSTMmode == 7 then
-           pred = model:forward(input)
+           pred = model:forward(input_lstm_fwd)
        else
-           pred = model:forward(input)
+           pred = model:forward{input_lstm_fwd, input_lstm_bwd}
        end
        
        local prob, pos 

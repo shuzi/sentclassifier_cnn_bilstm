@@ -59,7 +59,9 @@ elseif opt.LSTMmode == 4 then
 elseif opt.LSTMmode == 5 then
   lstm_fwd = cudnn.LSTM(opt.numFilters, opt.LSTMhiddenSize, 1, true)
   rnn_fwd:add(lstm_fwd)
-  --rnn_fwd:add(nn.AddConstantNeg(-20000))
+  if opt.useACN then
+    rnn_fwd:add(nn.AddConstantNeg(-20000))
+  end
   rnn_fwd:add(nn.Max(2))
 elseif opt.LSTMmode == 6 then
   lstm_fwd = cudnn.LSTM(opt.numFilters, opt.LSTMhiddenSize, 1, true)
@@ -68,6 +70,9 @@ elseif opt.LSTMmode == 6 then
 end
 
 rnn_bwd = nn.Sequential()
+if opt.LSTMmode ~= 7 then
+  rnn_bwd:add(nn.SeqReverseSequence(2))
+end
 if opt.dropout > 0 then
   rnn_bwd:add(nn.Dropout(opt.dropout))
 end
@@ -98,7 +103,9 @@ elseif opt.LSTMmode == 4 then
 elseif opt.LSTMmode == 5 then
   lstm_bwd = cudnn.LSTM(opt.numFilters, opt.LSTMhiddenSize, 1, true)
   rnn_bwd:add(lstm_bwd)
---  rnn_bwd:add(nn.AddConstantNeg(-20000))
+  if opt.useACN then
+    rnn_bwd:add(nn.AddConstantNeg(-20000))
+  end
   rnn_bwd:add(nn.Max(2))
 elseif opt.LSTMmode == 6 then
   lstm_bwd = cudnn.LSTM(opt.numFilters, opt.LSTMhiddenSize, 1, true)
@@ -110,7 +117,9 @@ end
 if opt.LSTMmode == 7 then
   bilstm = nn.Sequential()
   bilstm:add(cudnn.BLSTM(opt.numFilters, opt.LSTMhiddenSize, 1, true))
-  bilstm:add(nn.AddConstantNeg(-20000))
+  if opt.useACN then
+    bilstm:add(nn.AddConstantNeg(-20000))
+  end
   bilstm:add(nn.Max(2))
 else
   bilstm = nn.ConcatTable()
