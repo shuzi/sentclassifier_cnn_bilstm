@@ -3,7 +3,7 @@ require 'rnn'
 dofile('AddConstantNeg.lua')
 --dofile('ArgMax.lua')
 dofile('options.lua')
-
+dofile('optim-msgd.lua')
 local stringx = require 'pl.stringx'
 if io.open("configure", "r") then
    for line in io.lines("configure") do
@@ -134,6 +134,10 @@ elseif opt.model == 6 then
    dofile 'model_birnn.lua'
 elseif opt.model == 7 then
    dofile 'model_bigru.lua'
+elseif opt.model == 8 then
+   dofile 'model_cnn_cnn.lua'
+elseif opt.model == 9 then
+   dofile 'model_cnn_cnn_cnn.lua'
 end
 collectgarbage()
 collectgarbage()

@@ -184,7 +184,13 @@ elseif opt.optimization == 'LBFGS' then
       nCorrection = 10
    }
    optimMethod = optim.lbfgs
-
+elseif opt.optimization == 'sgd' then
+    optimState = {
+      lr = opt.learningRate,
+      lrd = opt.weightDecay,
+      mom = opt.momentum,
+   }
+   optimMethod = optim.msgd
 elseif opt.optimization == 'SGD' then
    optimState = {
       learningRate = opt.learningRate,

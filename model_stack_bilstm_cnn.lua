@@ -162,7 +162,13 @@ elseif opt.optimization == 'LBFGS' then
       nCorrection = 10
    }
    optimMethod = optim.lbfgs
-
+elseif opt.optimization == 'sgd' then
+    optimState = {
+      lr = opt.learningRate,
+      lrd = opt.weightDecay,
+      mom = opt.momentum,
+   }
+   optimMethod = optim.msgd
 elseif opt.optimization == 'SGD' then
    optimState = {
       learningRate = opt.learningRate,
@@ -259,7 +265,7 @@ function train()
                parametersClone:copy(parameters)
                gradParameters:add( parametersClone:mul(opt.L2reg) )
             end
---           gradParameters:clamp(-opt.gradClip, opt.gradClip)
+            gradParameters:clamp(-opt.gradClip, opt.gradClip)
             return f,gradParameters
         end
 
