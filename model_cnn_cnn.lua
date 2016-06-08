@@ -26,8 +26,8 @@ else
 end
 cnn:add(conv2)
 --cnn:add(nn.AddConstantNeg(-20000))
+cnn:add(nn.ReLU())
 cnn:add(nn.Max(2))
-cnn:add(nn.Tanh())
 cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))
 if opt.lastReLU then
   cnn:add(nn.ReLU())

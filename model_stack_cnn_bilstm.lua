@@ -133,6 +133,8 @@ if opt.LSTMmode ~= 7 then
 end
 --model:add(nn.Dropout(0.5))
 --model:add(cudnn.BatchNormalization(opt.hiddenDim + 2*opt.LSTMhiddenSize))
+model:add(nn.Linear(2*opt.LSTMhiddenSize, 2*opt.LSTMhiddenSize))
+model:add(nn.ReLU())
 model:add(nn.Linear(2*opt.LSTMhiddenSize, opt.numLabels))
 model:add(nn.LogSoftMax())
 
