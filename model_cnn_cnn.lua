@@ -31,10 +31,6 @@ cnn:add(conv2)
 --cnn:add(nn.AddConstantNeg(-20000))
 cnn:add(nn.ReLU())
 cnn:add(nn.Max(2))
-<<<<<<< HEAD
---cnn:add(nn.Tanh())
-=======
->>>>>>> 6c85353ae7093f992f30e17bd21d2fbc9eb9b51d
 cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))
 if opt.lastReLU then
   cnn:add(nn.ReLU())
