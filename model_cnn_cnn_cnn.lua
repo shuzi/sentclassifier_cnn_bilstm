@@ -15,8 +15,10 @@ elseif fbok then
 else
    conv = nn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 end
+
 cnn:add(conv)
 cnn:add(nn.ReLU())
+
 if cudnnok then
    conv2 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
 elseif fbok then
@@ -24,21 +26,24 @@ elseif fbok then
 else
    conv2 = nn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
 end
+
 cnn:add(conv2)
 cnn:add(nn.ReLU())
+cnn:add(nn.TemporalMaxPooling(2))
+
 if cudnnok then
-   conv3 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
+   conv3 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters*2, opt.contConvWidth)
 elseif fbok then
    conv3 = nn.TemporalConvolutionFB(opt.numFilters, opt.numFilters, opt.contConvWidth)
 else
-   conv3 = nn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
+   conv3 = nn.TemporalConvolution(opt.numFilters, opt.numFilters*2, opt.contConvWidth)
 end
 cnn:add(conv3)
 
 --cnn:add(nn.AddConstantNeg(-20000))
+cnn:add(nn.ReLU())
 cnn:add(nn.Max(2))
-cnn:add(nn.Tanh())
-cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))
+cnn:add(nn.Linear(opt.numFilters*2, opt.hiddenDim))
 if opt.lastReLU then
   cnn:add(nn.ReLU())
 else
