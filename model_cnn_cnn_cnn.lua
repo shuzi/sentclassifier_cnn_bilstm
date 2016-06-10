@@ -40,7 +40,6 @@ else
 end
 cnn:add(conv3)
 
---cnn:add(nn.AddConstantNeg(-20000))
 cnn:add(nn.ReLU())
 cnn:add(nn.Max(2))
 cnn:add(nn.Linear(opt.numFilters*2, opt.hiddenDim))
