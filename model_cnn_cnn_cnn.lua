@@ -1,7 +1,9 @@
 dofile('optim-rmsprop-single.lua')
+dofile('MapTable.lua')
 
 L_cnn = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
 L_cnn.weight:sub(2,-1):copy(mapWordIdx2Vector)
+
 
 cnn = nn.Sequential()
 cnn:add(L_cnn)
@@ -17,6 +19,22 @@ else
 end
 
 cnn:add(conv)
+
+if opt.conv1Norm then
+  norm=nn.Sequential()
+  if opt.normTrans then
+    norm:add(nn.Transpose({1,2}))
+    norm:add(nn.Normalize(2))
+    norm:add(nn.Transpose({2,1}))
+  else
+    norm:add(nn.Normalize(2))
+  end
+  cnn:add(nn.SplitTable(1))
+  cnn:add(nn.MapTable():add(norm))
+  cnn:add(nn.JoinTable(1))
+  cnn:add(nn.View(opt.batchSize, -1,opt.numFilters ))
+end
+
 cnn:add(nn.ReLU())
 
 if cudnnok then
@@ -26,23 +44,58 @@ elseif fbok then
 else
    conv2 = nn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
 end
-
 cnn:add(conv2)
+
+if opt.conv2Norm then
+  norm=nn.Sequential()
+  if opt.normTrans then
+    norm:add(nn.Transpose({1,2}))
+    norm:add(nn.Normalize(2))
+    norm:add(nn.Transpose({2,1}))
+  else
+    norm:add(nn.Normalize(2))
+  end
+  cnn:add(nn.SplitTable(1))
+  cnn:add(nn.MapTable():add(norm))
+  cnn:add(nn.JoinTable(1))
+  cnn:add(nn.View(opt.batchSize, -1,opt.numFilters ))
+end
+
 cnn:add(nn.ReLU())
-cnn:add(nn.TemporalMaxPooling(2))
+--cnn:add(nn.TemporalMaxPooling(2))
 
 if cudnnok then
-   conv3 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters*2, opt.contConvWidth)
+   conv3 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
 elseif fbok then
    conv3 = nn.TemporalConvolutionFB(opt.numFilters, opt.numFilters, opt.contConvWidth)
 else
-   conv3 = nn.TemporalConvolution(opt.numFilters, opt.numFilters*2, opt.contConvWidth)
+   conv3 = nn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
 end
 cnn:add(conv3)
 
+if opt.conv3Norm then
+  norm=nn.Sequential()
+  if opt.normTrans then
+    norm:add(nn.Transpose({1,2}))
+    norm:add(nn.Normalize(2))
+    norm:add(nn.Transpose({2,1}))
+  else
+    norm:add(nn.Normalize(2))
+  end
+  cnn:add(nn.SplitTable(1))
+  cnn:add(nn.MapTable():add(norm))
+  cnn:add(nn.JoinTable(1))
+  cnn:add(nn.View(opt.batchSize, -1,opt.numFilters ))
+end
+
 cnn:add(nn.ReLU())
+
+
+
+
+
 cnn:add(nn.Max(2))
-cnn:add(nn.Linear(opt.numFilters*2, opt.hiddenDim))
+cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))
 if opt.lastReLU then
   cnn:add(nn.ReLU())
 else
@@ -158,6 +211,7 @@ function train()
 --    optimState.learningRate = opt.learningRate
     local time = sys.clock()
     model:training()
+   
     local batches = trainDataTensor:size()[1]/opt.batchSize
     local bs = opt.batchSize
     shuffle = torch.randperm(batches)
@@ -167,6 +221,19 @@ function train()
         local target = trainDataTensor_y:narrow(1, begin , bs)
         local input_lstm_fwd = trainDataTensor_lstm_fwd:narrow(1, begin , bs)
         local input_lstm_bwd = trainDataTensor_lstm_bwd:narrow(1, begin , bs)
+        if cudnnok then
+          conv_nodes = model:findModules('cudnn.TemporalConvolution')
+        else
+          conv_nodes = model:findModules('nn.TemporalConvolution')
+        end
+        for i = 1, #conv_nodes do
+          conv_nodes[i].bias:fill(0)
+        end
+   --     print(conv_nodes)
+   --     print(container_nodes)
+   --     model:get(1):get(2).bias:fill(0)
+   --     model:get(1):get(4).bias:fill(0)
+     --   model:get(1):get(6).bias:fill(0)
         
         local feval = function(x)
             if x ~= parameters then
@@ -223,6 +290,14 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
     local correct = 0
     local correct2 = 0
     local curr = -1
+    if cudnnok then
+       conv_nodes = model:findModules('cudnn.TemporalConvolution')
+    else
+       conv_nodes = model:findModules('nn.TemporalConvolution')
+    end
+    for i = 1, #conv_nodes do
+       conv_nodes[i].bias:fill(0)
+    end
     for t = 1,batches,1 do
         curr = t
         local begin = (t - 1)*bs + 1

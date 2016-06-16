@@ -74,13 +74,16 @@ end
 opt.cutoff = cutoff
 print(string.format("%s  %f", "Final length cutoff: ", cutoff))
 --]]
-trainDataTensor_ydim = train_cutoff + opt.contConvWidth + opt.contConvWidth - 1
-validDataTensor_ydim = valid_cutoff + opt.contConvWidth + opt.contConvWidth - 1
-testDataTensor_ydim = valid_cutoff + opt.contConvWidth + opt.contConvWidth - 1
+trainDataTensor_ydim = train_cutoff
+validDataTensor_ydim = valid_cutoff
+testDataTensor_ydim = valid_cutoff
 trainDataTensor = torch.Tensor(math.ceil(train_size/opt.batchSize)*opt.batchSize, trainDataTensor_ydim):zero()
 trainDataTensor_y = torch.Tensor(math.ceil(train_size/opt.batchSize)*opt.batchSize):zero()
+trainDataTensor_len = torch.Tensor(math.ceil(train_size/opt.batchSize)*opt.batchSize):zero()
 validDataTensor = torch.Tensor(valid_size, validDataTensor_ydim):zero()
+validDataTensor_len = torch.Tensor(valid_size):zero()
 testDataTensor = torch.Tensor(test_size, testDataTensor_ydim):zero()
+testDataTensor_len = torch.Tensor(test_size):zero()
 trainDataTensor_lstm_fwd = torch.Tensor(math.ceil(train_size/opt.batchSize)*opt.batchSize, trainDataTensor_ydim):zero()
 trainDataTensor_lstm_bwd = torch.Tensor(math.ceil(train_size/opt.batchSize)*opt.batchSize, trainDataTensor_ydim):zero()
 validDataTensor_lstm_fwd = torch.Tensor(valid_size, validDataTensor_ydim):zero()
@@ -148,15 +151,17 @@ while true do
         end
     end
 end
-
+print("Embedding file loading finished!")
 ln = 0 
 for line in io.lines(opt.trainFile) do
-    ln = ln + 1
---    for i=1,opt.contConvWidth  do trainDataTensor[ln][i] = 0 ; end
+    ln = ln + 1  
+    if ln % 10000 == 0 then
+       print(".........." .. tostring(ln))
+    end
     trainDataTensor_y[ln] = tonumber(stringx.split(line, '\t')[1]) 
     local text = stringx.split(line, '\t')[2]
     local w = stringx.split(text)
-    local j = opt.contConvWidth + 1
+    local j = 1
     
     local j_lstm_fwd
     local j_lstm_bwd = trainDataTensor_ydim
@@ -167,7 +172,8 @@ for line in io.lines(opt.trainFile) do
     end
  
     for i = 1,#w do
-       if mapWordStr2WordIdx[w[i]] == nil then
+       local word_idx = mapWordStr2WordIdx[w[i]]
+       if word_idx == nil then
           if idx > mapWordIdx2Vector:size()[1] then
              augmentWordIdx2Vector()
           end
@@ -177,20 +183,22 @@ for line in io.lines(opt.trainFile) do
           for i=1,opt.embeddingDim do oovEmbedding[i] = math.random(); end
           mapWordIdx2Vector:narrow(1,idx,1):copy(torch.Tensor(oovEmbedding))
           idx = idx + 1
+          word_idx = mapWordStr2WordIdx[w[i]]
        end
-       if j <= trainDataTensor_ydim - opt.contConvWidth + 1 then 
-          trainDataTensor[ln][j] = mapWordStr2WordIdx[w[i]]
+       if j <= trainDataTensor_ydim then 
+          trainDataTensor[ln][j] = word_idx
           j = j + 1
        end
        if j_lstm_fwd <= trainDataTensor_ydim then
-          trainDataTensor_lstm_fwd[ln][j_lstm_fwd] = mapWordStr2WordIdx[w[i]]
+          trainDataTensor_lstm_fwd[ln][j_lstm_fwd] = word_idx
           j_lstm_fwd = j_lstm_fwd + 1
        end
        if j_lstm_bwd >= 1 then
-          trainDataTensor_lstm_bwd[ln][j_lstm_bwd] = mapWordStr2WordIdx[w[i]]
+          trainDataTensor_lstm_bwd[ln][j_lstm_bwd] = word_idx
           j_lstm_bwd = j_lstm_bwd - 1
        end
     end
+    trainDataTensor_len[ln] = j-1
 end
 
 while ln < trainDataTensor:size()[1] do
@@ -200,6 +208,7 @@ while ln < trainDataTensor:size()[1] do
     trainDataTensor:narrow(1,ln,1):copy( trainDataTensor:narrow(1,i,1) )
     trainDataTensor_lstm_fwd:narrow(1,ln,1):copy( trainDataTensor_lstm_fwd:narrow(1,i,1) )
     trainDataTensor_lstm_bwd:narrow(1,ln,1):copy( trainDataTensor_lstm_bwd:narrow(1,i,1) )
+    trainDataTensor_len[ln] = trainDataTensor_len[i]
 end
 
 
@@ -214,8 +223,7 @@ for line in io.lines(opt.validFile) do
     table.insert(validDataTensor_y, tempL)
     local text = stringx.split(line, '\t')[2]
     local w = stringx.split(text)
-    local j = opt.contConvWidth + 1
-
+    local j = 1
 
     local j_lstm_fwd
     local j_lstm_bwd = validDataTensor_ydim
@@ -224,7 +232,6 @@ for line in io.lines(opt.validFile) do
     else
       j_lstm_fwd = validDataTensor_ydim - #w + 1
     end
-
 
     for i = 1,#w do
        if mapWordStr2WordIdx[w[i]] == nil then
@@ -238,7 +245,7 @@ for line in io.lines(opt.validFile) do
           mapWordIdx2Vector:narrow(1,idx,1):copy(torch.Tensor(oovEmbedding))
           idx = idx + 1
        end
-       if j <= validDataTensor_ydim - opt.contConvWidth + 1 then
+       if j <= validDataTensor_ydim then
           validDataTensor[ln][j] = mapWordStr2WordIdx[w[i]]
           j = j + 1
        end
@@ -251,8 +258,8 @@ for line in io.lines(opt.validFile) do
          j_lstm_bwd = j_lstm_bwd - 1
        end
     end
+    validDataTensor_len[ln] = j - 1
 end
-
 
 ln = 0
 for line in io.lines(opt.testFile) do
@@ -265,7 +272,7 @@ for line in io.lines(opt.testFile) do
     table.insert(testDataTensor_y, tempL)
     local text = stringx.split(line, '\t')[2]
     local w = stringx.split(text)
-    local j = opt.contConvWidth + 1
+    local j = 1
 
     local j_lstm_fwd
     local j_lstm_bwd = testDataTensor_ydim
@@ -287,7 +294,7 @@ for line in io.lines(opt.testFile) do
           mapWordIdx2Vector:narrow(1,idx,1):copy(torch.Tensor(oovEmbedding))
           idx = idx + 1
        end
-       if j <= testDataTensor_ydim - opt.contConvWidth + 1 then
+       if j <= testDataTensor_ydim then
           testDataTensor[ln][j] = mapWordStr2WordIdx[w[i]]
           j = j + 1
        end
@@ -300,8 +307,8 @@ for line in io.lines(opt.testFile) do
          j_lstm_bwd = j_lstm_bwd - 1
        end
     end
+    testDataTensor_len[ln] = j - 1
 end
-
 
 print(string.format('training data size: %s x %s', trainDataTensor:size()[1], trainDataTensor:size()[2]))
 print(string.format('training data size: %s x %s', trainDataTensor_lstm_fwd:size()[1], trainDataTensor_lstm_fwd:size()[2]))
@@ -311,12 +318,9 @@ print(string.format('valid data size: %s x %s', validDataTensor:size()[1], valid
 print(string.format('valid data size: %s x %s', validDataTensor_lstm_fwd:size()[1], validDataTensor_lstm_fwd:size()[2]))
 print(string.format('valid data size: %s x %s', validDataTensor_lstm_bwd:size()[1], validDataTensor_lstm_bwd:size()[2]))
 
-
 print(string.format('test data size: %s x %s', testDataTensor:size()[1], testDataTensor:size()[2]))
 print(string.format('test data size: %s x %s', testDataTensor_lstm_fwd:size()[1], testDataTensor_lstm_fwd:size()[2]))
 print(string.format('test data size: %s x %s', testDataTensor_lstm_bwd:size()[1], testDataTensor_lstm_bwd:size()[2]))
-
-
 
 print(string.format('mapWordIdx2WordStr size: %s', #mapWordIdx2WordStr))
 print(string.format('mapWordIdx2Vector size: %s', mapWordIdx2Vector:size()[1]))

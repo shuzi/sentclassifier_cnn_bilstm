@@ -16,7 +16,6 @@ else
    conv = nn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 end
 cnn:add(conv)
-cnn:add(cudnn.BatchNormalization(opt.numFilters))
 cnn:add(nn.ReLU())
 if cudnnok then
    conv2 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
@@ -40,8 +39,7 @@ end
 
 model = nn.Sequential()
 model:add(cnn)
---model:add(nn.Dropout(0.5))
---model:add(cudnn.BatchNormalization(opt.hiddenDim + 2*opt.LSTMhiddenSize))
+
 model:add(nn.Linear(opt.hiddenDim, opt.numLabels))
 model:add(nn.LogSoftMax())
 
@@ -156,7 +154,7 @@ function train()
         local target = trainDataTensor_y:narrow(1, begin , bs)
         local input_lstm_fwd = trainDataTensor_lstm_fwd:narrow(1, begin , bs)
         local input_lstm_bwd = trainDataTensor_lstm_bwd:narrow(1, begin , bs)
-        print(trainDataTensor) os.exit(1)
+        
         local feval = function(x)
             if x ~= parameters then
                 parameters:copy(x)

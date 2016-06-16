@@ -1,7 +1,8 @@
 #!/opt/share/torch-7.0/bin/th
 require 'rnn'
+require 'nn'
 dofile('AddConstantNeg.lua')
---dofile('ArgMax.lua')
+dofile('TopK.lua')
 dofile('options.lua')
 dofile('optim-msgd.lua')
 local stringx = require 'pl.stringx'
@@ -106,7 +107,11 @@ testDataTensor_lstm_fwd = torch.Tensor()
 testDataTensor_lstm_bwd = torch.Tensor()
 testDataTensor_y = {}
 
-dofile 'prepareData.lua'
+if opt.model < 10 then 
+  dofile 'prepareData.lua'
+else
+  dofile 'prepareData_nopadding.lua'
+end
 if opt.type == 'cuda' then
   trainDataTensor =  trainDataTensor:cuda()
   trainDataTensor_y =  trainDataTensor_y:cuda()
@@ -138,6 +143,16 @@ elseif opt.model == 8 then
    dofile 'model_cnn_cnn.lua'
 elseif opt.model == 9 then
    dofile 'model_cnn_cnn_cnn.lua'
+elseif opt.model == 10 then
+   dofile 'model_cnn_cnn_cnn_cnn.lua'
+elseif opt.model == 11 then
+   dofile 'model_cnn_depth5.lua'
+elseif opt.model == 12 then
+   dofile 'model_cnn_depth9.lua'
+elseif opt.model == 13 then
+   dofile 'model_cnn_depth5_spatial.lua'
+elseif opt.model == 16 then
+   dofile 'model_cnn_cnn_cnn_bs1.lua'
 end
 collectgarbage()
 collectgarbage()
@@ -149,8 +164,14 @@ validState = {}
 testState = {}
 while epoch <= opt.epoch do
    train()
-   test(validDataTensor, validDataTensor_lstm_fwd, validDataTensor_lstm_bwd, validDataTensor_y, validState)
-   test(testDataTensor, testDataTensor_lstm_fwd, testDataTensor_lstm_bwd, testDataTensor_y, testState)
+   if opt.model == 16 then
+     test(validDataTensor, validDataTensor_len, validDataTensor_lstm_fwd, validDataTensor_lstm_bwd, validDataTensor_y, validState)
+     test(testDataTensor, testDataTensor_len, testDataTensor_lstm_fwd, testDataTensor_lstm_bwd, testDataTensor_y, testState)
+   else
+     test(validDataTensor,  validDataTensor_lstm_fwd, validDataTensor_lstm_bwd, validDataTensor_y, validState)
+     test(testDataTensor, testDataTensor_lstm_fwd, testDataTensor_lstm_bwd, testDataTensor_y, testState)
+   end
+
    if opt.outputprefix ~= 'none' then
       if opt.saveMode == 'last' and epoch == opt.epoch then
          local t = sys.toc()
