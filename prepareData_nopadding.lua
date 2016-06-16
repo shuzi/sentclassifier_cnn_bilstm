@@ -325,6 +325,22 @@ print(string.format('test data size: %s x %s', testDataTensor_lstm_bwd:size()[1]
 print(string.format('mapWordIdx2WordStr size: %s', #mapWordIdx2WordStr))
 print(string.format('mapWordIdx2Vector size: %s', mapWordIdx2Vector:size()[1]))
 
+if true then
+   torch.save('mapWordIdx2Vector', mapWordIdx2Vector)
+   torch.save('trainDataTensor', trainDataTensor)
+   torch.save('trainDataTensor_y',trainDataTensor_y)
+   torch.save('trainDataTensor_lstm_fwd', trainDataTensor_lstm_fwd)
+   torch.save('trainDataTensor_lstm_bwd', trainDataTensor_lstm_bwd)
+   torch.save('validDataTensor', validDataTensor)
+   torch.save('validDataTensor_lstm_fwd', validDataTensor_lstm_fwd)
+   torch.save('validDataTensor_lstm_bwd', validDataTensor_lstm_bwd)
+   torch.save('validDataTensor_y', validDataTensor_y)
+   torch.save('testDataTensor', testDataTensor)
+   torch.save('testDataTensor_lstm_fwd', testDataTensor_lstm_fwd)
+   torch.save('testDataTensor_lstm_bwd', testDataTensor_lstm_bwd)
+   torch.save('testDataTensor_y', testDataTensor_y)
+end
+
 assert(trainFileHandle:close())
 assert(validFileHandle:close())
 assert(testFileHandle:close())

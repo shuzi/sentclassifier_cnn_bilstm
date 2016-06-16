@@ -107,11 +107,28 @@ testDataTensor_lstm_fwd = torch.Tensor()
 testDataTensor_lstm_bwd = torch.Tensor()
 testDataTensor_y = {}
 
-if opt.model < 10 then 
-  dofile 'prepareData.lua'
+if opt.loadBin then
+  mapWordIdx2Vector = torch.load('mapWordIdx2Vector')
+  trainDataTensor = torch.load('trainDataTensor')
+  trainDataTensor_y =  torch.load('trainDataTensor_y')
+  trainDataTensor_lstm_fwd = torch.load('trainDataTensor_lstm_fwd')
+  trainDataTensor_lstm_bwd = torch.load('trainDataTensor_lstm_bwd')
+  validDataTensor =  torch.load('validDataTensor')
+  validDataTensor_lstm_fwd = torch.load('validDataTensor_lstm_fwd')
+  validDataTensor_lstm_bwd = torch.load('validDataTensor_lstm_bwd')
+  validDataTensor_y = torch.load('validDataTensor_y')
+  testDataTensor = torch.load('testDataTensor')
+  testDataTensor_lstm_fwd = torch.load('testDataTensor_lstm_fwd')
+  testDataTensor_lstm_bwd = torch.load('testDataTensor_lstm_bwd')
+  testDataTensor_y = torch.load('testDataTensor_y')
 else
-  dofile 'prepareData_nopadding.lua'
+  if opt.model < 10 then
+    dofile 'prepareData.lua'
+  else
+    dofile 'prepareData_nopadding.lua'
+  end
 end
+
 if opt.type == 'cuda' then
   trainDataTensor =  trainDataTensor:cuda()
   trainDataTensor_y =  trainDataTensor_y:cuda()
@@ -165,11 +182,15 @@ testState = {}
 while epoch <= opt.epoch do
    train()
    if opt.model == 16 then
-     test(validDataTensor, validDataTensor_len, validDataTensor_lstm_fwd, validDataTensor_lstm_bwd, validDataTensor_y, validState)
-     test(testDataTensor, testDataTensor_len, testDataTensor_lstm_fwd, testDataTensor_lstm_bwd, testDataTensor_y, testState)
+     if opt.valid then
+       test(validDataTensor, validDataTensor_len, validDataTensor_lstm_fwd, validDataTensor_lstm_bwd, validDataTensor_y, validState)
+       test(testDataTensor, testDataTensor_len, testDataTensor_lstm_fwd, testDataTensor_lstm_bwd, testDataTensor_y, testState)
+     end
    else
-     test(validDataTensor,  validDataTensor_lstm_fwd, validDataTensor_lstm_bwd, validDataTensor_y, validState)
-     test(testDataTensor, testDataTensor_lstm_fwd, testDataTensor_lstm_bwd, testDataTensor_y, testState)
+     if opt.test then
+       test(validDataTensor,  validDataTensor_lstm_fwd, validDataTensor_lstm_bwd, validDataTensor_y, validState)
+       test(testDataTensor, testDataTensor_lstm_fwd, testDataTensor_lstm_bwd, testDataTensor_y, testState)
+     end
    end
 
    if opt.outputprefix ~= 'none' then
