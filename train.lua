@@ -184,11 +184,15 @@ while epoch <= opt.epoch do
    if opt.model == 16 then
      if opt.valid then
        test(validDataTensor, validDataTensor_len, validDataTensor_lstm_fwd, validDataTensor_lstm_bwd, validDataTensor_y, validState)
+     end
+     if opt.test then
        test(testDataTensor, testDataTensor_len, testDataTensor_lstm_fwd, testDataTensor_lstm_bwd, testDataTensor_y, testState)
      end
    else
-     if opt.test then
+     if opt.valid then
        test(validDataTensor,  validDataTensor_lstm_fwd, validDataTensor_lstm_bwd, validDataTensor_y, validState)
+     end
+     if opt.test then
        test(testDataTensor, testDataTensor_lstm_fwd, testDataTensor_lstm_bwd, testDataTensor_y, testState)
      end
    end

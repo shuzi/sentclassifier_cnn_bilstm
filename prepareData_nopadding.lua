@@ -325,7 +325,7 @@ print(string.format('test data size: %s x %s', testDataTensor_lstm_bwd:size()[1]
 print(string.format('mapWordIdx2WordStr size: %s', #mapWordIdx2WordStr))
 print(string.format('mapWordIdx2Vector size: %s', mapWordIdx2Vector:size()[1]))
 
-if true then
+if opt.saveBin then
    torch.save('mapWordIdx2Vector', mapWordIdx2Vector)
    torch.save('trainDataTensor', trainDataTensor)
    torch.save('trainDataTensor_y',trainDataTensor_y)
