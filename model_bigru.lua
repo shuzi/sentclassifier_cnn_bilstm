@@ -17,6 +17,7 @@ if opt.useACN then
   rnn_fwd:add(nn.AddConstantNeg(-20000))
 end
 rnn_fwd:add(nn.Max(2))
+rnn_fwd:add(nn.ReLU())
 
 rnn_bwd = nn.Sequential()
 rnn_bwd:add(L_gru_bwd)
@@ -28,6 +29,7 @@ if opt.useACN then
   rnn_bwd:add(nn.AddConstantNeg(-20000))
 end
 rnn_bwd:add(nn.Max(2))
+rnn_bwd:add(nn.ReLU())
 
 model = nn.Sequential()
 bigru = nn.ParallelTable()

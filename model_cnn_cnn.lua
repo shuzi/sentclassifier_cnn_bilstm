@@ -9,7 +9,7 @@ if opt.dropout > 0 then
    cnn:add(nn.Dropout(opt.dropout))
 end
 if cudnnok then
-   conv = cudnn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
+   conv = cudnn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth, nil, 1)
 elseif fbok then
    conv = nn.TemporalConvolutionFB(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 else
@@ -18,7 +18,7 @@ end
 cnn:add(conv)
 cnn:add(nn.ReLU())
 if cudnnok then
-   conv2 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
+   conv2 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, nil, 1)
 elseif fbok then
    conv2 = nn.TemporalConvolutionFB(opt.numFilters, opt.numFilters, opt.contConvWidth)
 else
@@ -40,6 +40,9 @@ end
 model = nn.Sequential()
 model:add(cnn)
 
+if opt.dropout > 0 then
+  model:add(nn.Dropout(opt.dropout))
+end
 model:add(nn.Linear(opt.hiddenDim, opt.numLabels))
 model:add(nn.LogSoftMax())
 

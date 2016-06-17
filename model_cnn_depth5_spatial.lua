@@ -1,70 +1,106 @@
 dofile('optim-rmsprop-single.lua')
+dofile('MapTable.lua')
 
-L_rnn_fwd = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
-L_rnn_bwd = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
-L_rnn_fwd.weight:sub(2,-1):copy(mapWordIdx2Vector)
-L_rnn_bwd.weight = L_rnn_fwd.weight
-L_rnn_bwd.gradWeight = L_rnn_fwd.gradWeight
+L_cnn = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
+L_cnn.weight:sub(2,-1):copy(mapWordIdx2Vector)
 
 
-rnn_fwd = nn.Sequential()
-rnn_fwd:add(L_rnn_fwd)
+cnn = nn.Sequential()
+cnn:add(L_cnn)
+
 if opt.dropout > 0 then
-  rnn_fwd:add(nn.Dropout(opt.dropout))
+   cnn:add(nn.Dropout(opt.dropout))
 end
-if opt.rnnTanh then
-  rnn_fwd:add(cudnn.RNNTanh(opt.embeddingDim, opt.RNNhiddenSize, 1, true))
-  if opt.useACN then
-    rnn_fwd:add(nn.AddConstantNeg(-20000))
-  end
-  rnn_fwd:add(nn.Max(2))
-end
-if opt.rnnReLU then
-  rnn_fwd:add(cudnn.RNNReLU(opt.embeddingDim, opt.RNNhiddenSize, 1, true))
-  if opt.useACN then
-    rnn_fwd:add(nn.AddConstantNeg(-20000))
-  end
-  rnn_fwd:add(nn.Max(2))
-end
-rnn_fwd:add(nn.ReLU())
 
-rnn_bwd = nn.Sequential()
-rnn_bwd:add(L_rnn_bwd)
-if opt.dropout > 0 then
-  rnn_bwd:add(nn.Dropout(opt.dropout))
+if cudnnok then
+   conv = cudnn.TemporalConvolution(opt.embeddingDim, opt.numFilters, opt.contConvWidth)
+elseif fbok then
+   conv = nn.TemporalConvolutionFB(opt.embeddingDim, opt.numFilters, opt.contConvWidth)
+else
+   conv = nn.TemporalConvolution(opt.embeddingDim, opt.numFilters, opt.contConvWidth)
 end
-if opt.rnnTanh then
-  rnn_bwd:add(cudnn.RNNTanh(opt.embeddingDim, opt.RNNhiddenSize, 1, true))
-  if opt.useACN then
-    rnn_bwd:add(nn.AddConstantNeg(-20000))
-  end
-  rnn_bwd:add(nn.Max(2))
+cnn:add(conv)
+------------------------------------------------------------------------------------------------------------
+cnn:add(nn.View(opt.batchSize, -1, 1, opt.embeddingDim))
+cnn:add(nn.Transpose({2,4}))
+if cudnnok then
+   conv2 = cudnn.SpatialConvolution(opt.embeddingDim, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
+   cnn:add(conv2)
+   cnn:add(cudnn.SpatialBatchNormalization(opt.numFilters))
+else
+   conv2 = nn.SpatialConvolution(opt.embeddingDim, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
+   cnn:add(conv2)
+   cnn:add(nn.SpatialBatchNormalization(opt.numFilters))
 end
-if opt.rnnReLU then
-  rnn_bwd:add(cudnn.RNNReLU(opt.embeddingDim, opt.RNNhiddenSize, 1, true))
-  if opt.useACN then
-    rnn_bwd:add(nn.AddConstantNeg(-20000))
-  end
-  rnn_bwd:add(nn.Max(2))
+cnn:add(nn.Transpose({2,4}))
+cnn:add(nn.View(opt.batchSize, -1, opt.numFilters))
+cnn:add(nn.ReLU())
+cnn:add(nn.View(opt.batchSize, -1, 1, opt.numFilters))
+cnn:add(nn.Transpose({2,4}))
+if cudnnok then
+   conv3 = cudnn.SpatialConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
+   cnn:add(conv3)
+   cnn:add(cudnn.SpatialBatchNormalization(opt.numFilters))
+else
+   conv3 = nn.SpatialConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
+   cnn:add(conv3)
+   cnn:add(nn.SpatialBatchNormalization(opt.numFilters))
 end
-rnn_bwd:add(nn.ReLU())
+cnn:add(nn.Transpose({2,4}))
+cnn:add(nn.View(opt.batchSize, -1, opt.numFilters))
+cnn:add(nn.ReLU())
+------------------------------------------------------------------------------------------------------------
+
+conv4_filters = opt.numFilters
+if opt.TMP then
+  cnn:add(nn.TemporalMaxPooling(opt.contConvWidth, opt.contConvWidth-1))
+  conv4_filters=opt.numFilters*2
+end
+conv5_filters = conv4_filters
+------------------------------------------------------------------------------------------------------------
+cnn:add(nn.View(opt.batchSize, -1, 1, opt.numFilters))
+cnn:add(nn.Transpose({2,4}))
+if cudnnok then
+   conv4 = cudnn.SpatialConvolution(opt.numFilters, conv4_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
+   cnn:add(conv4)
+   cnn:add(cudnn.SpatialBatchNormalization(conv4_filters))
+else
+   conv4 = nn.SpatialConvolution(opt.numFilters, conv4_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
+   cnn:add(conv4)
+   cnn:add(nn.SpatialBatchNormalization(conv4_filters))
+end
+cnn:add(nn.Transpose({2,4}))
+cnn:add(nn.View(opt.batchSize, -1, conv4_filters))
+cnn:add(nn.ReLU())
+cnn:add(nn.View(opt.batchSize, -1, 1, conv4_filters))
+cnn:add(nn.Transpose({2,4}))
+if cudnnok then
+   conv5 = cudnn.SpatialConvolution(conv4_filters, conv5_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
+   cnn:add(conv5)
+   cnn:add(cudnn.SpatialBatchNormalization(conv5_filters))
+else
+   conv5 = nn.SpatialConvolution(conv4_filters, conv5_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
+   cnn:add(conv5)
+   cnn:add(nn.SpatialBatchNormalization(conv5_filters))
+end
+cnn:add(nn.Transpose({2,4}))
+cnn:add(nn.View(opt.batchSize, -1, conv5_filters))
+cnn:add(nn.ReLU())
+------------------------------------------------------------------------------------------------------------
+
+cnn:add(nn.TopK(opt.topk, 2, true, true))
+cnn:add(nn.View(opt.batchSize, -1))
+cnn:add(nn.Linear(conv5_filters*opt.topk, opt.hiddenDim))
+cnn:add(nn.ReLU())
 
 
 model = nn.Sequential()
-birnn = nn.ParallelTable()
-birnn:add(rnn_fwd):add(rnn_bwd)
-model:add(birnn)
-model:add(nn.JoinTable(2))
-
---model:add(nn.Dropout(0.5))
---model:add(cudnn.BatchNormalization(opt.hiddenDim + 2*opt.LSTMhiddenSize))
-model:add(nn.Linear(2*opt.RNNhiddenSize, 2*opt.RNNhiddenSize))
-if opt.lastReLU then
-  model:add(nn.ReLU())
-else
-  model:add(nn.Tanh())
+model:add(cnn)
+if opt.dropout > 0 
+  model:add(nn.Dropout(opt.dropout))
 end
-model:add(nn.Linear(2*opt.RNNhiddenSize, opt.numLabels))
+
+model:add(nn.Linear(opt.hiddenDim, opt.numLabels))
 model:add(nn.LogSoftMax())
 
 if opt.twoCriterion then
@@ -169,6 +205,7 @@ function train()
 --    optimState.learningRate = opt.learningRate
     local time = sys.clock()
     model:training()
+   
     local batches = trainDataTensor:size()[1]/opt.batchSize
     local bs = opt.batchSize
     shuffle = torch.randperm(batches)
@@ -178,6 +215,21 @@ function train()
         local target = trainDataTensor_y:narrow(1, begin , bs)
         local input_lstm_fwd = trainDataTensor_lstm_fwd:narrow(1, begin , bs)
         local input_lstm_bwd = trainDataTensor_lstm_bwd:narrow(1, begin , bs)
+
+        if cudnnok then
+          conv_nodes = model:findModules('cudnn.TemporalConvolution')
+        else
+          conv_nodes = model:findModules('nn.TemporalConvolution')
+        end
+        for i = 1, #conv_nodes do
+          conv_nodes[i].bias:fill(0)
+        end
+        
+   --     print(conv_nodes)
+   --     print(container_nodes)
+   --     model:get(1):get(2).bias:fill(0)
+   --     model:get(1):get(4).bias:fill(0)
+        
         
         local feval = function(x)
             if x ~= parameters then
@@ -185,16 +237,16 @@ function train()
             end
             gradParameters:zero()
             local f = 0
-            if opt.LSTMmode == 7 then
-               local output = model:forward(input_lstm_fwd)
+            if true then
+               local output = model:forward(input)
                f = criterion:forward(output, target)
                local df_do = criterion:backward(output, target)
-               model:backward(input_lstm_fwd, df_do)
-            else 
-               local output = model:forward{input_lstm_fwd, input_lstm_bwd}
+               model:backward(input, df_do)
+            else
+               local output = model:forward(input)
                f = criterion:forward(output, target)
                local df_do = criterion:backward(output, target)
-               model:backward({input_lstm_fwd, input_lstm_bwd}, df_do) 
+               model:backward(input, df_do) 
             end
             --cutorch.synchronize()
             if opt.L1reg ~= 0 then
@@ -234,20 +286,23 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
     local correct = 0
     local correct2 = 0
     local curr = -1
+    if cudnnok then
+      conv_nodes = model:findModules('cudnn.TemporalConvolution')
+    else
+      conv_nodes = model:findModules('nn.TemporalConvolution')
+    end
+    for i = 1, #conv_nodes do
+       conv_nodes[i].bias:fill(0)
+    end
     for t = 1,batches,1 do
         curr = t
         local begin = (t - 1)*bs + 1
         local input = inputDataTensor:narrow(1, begin , bs)
         local input_lstm_fwd = inputDataTensor_lstm_fwd:narrow(1, begin , bs)
         local input_lstm_bwd = inputDataTensor_lstm_bwd:narrow(1, begin , bs)
-
-        local pred
-        if opt.LSTMmode == 7 then
-           pred = model:forward(input_lstm_fwd)
-        else 
-           pred = model:forward{input_lstm_fwd, input_lstm_bwd}
-        end
-        
+        local pred        
+        pred = model:forward(input)
+   
         local prob, pos
         if opt.twoCriterion then
            prob, pos = torch.max(pred[1], 2)
@@ -288,11 +343,7 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
        input_lstm_fwd:narrow(1,1,rest_size):copy(inputDataTensor_lstm_fwd:narrow(1, curr*bs + 1, rest_size))
        input_lstm_bwd:narrow(1,1,rest_size):copy(inputDataTensor_lstm_bwd:narrow(1, curr*bs + 1, rest_size))
        local pred
-       if opt.LSTMmode == 7 then
-           pred = model:forward(input_lstm_fwd)
-       else
-           pred = model:forward{input_lstm_fwd, input_lstm_bwd}
-       end
+       pred = model:forward(input)
 
        local prob, pos 
        if opt.twoCriterion then

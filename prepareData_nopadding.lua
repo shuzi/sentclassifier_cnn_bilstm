@@ -74,22 +74,24 @@ end
 opt.cutoff = cutoff
 print(string.format("%s  %f", "Final length cutoff: ", cutoff))
 --]]
+
+fillvalue = opt.padidx
 trainDataTensor_ydim = train_cutoff
 validDataTensor_ydim = valid_cutoff
 testDataTensor_ydim = valid_cutoff
-trainDataTensor = torch.Tensor(math.ceil(train_size/opt.batchSize)*opt.batchSize, trainDataTensor_ydim):zero()
-trainDataTensor_y = torch.Tensor(math.ceil(train_size/opt.batchSize)*opt.batchSize):zero()
-trainDataTensor_len = torch.Tensor(math.ceil(train_size/opt.batchSize)*opt.batchSize):zero()
-validDataTensor = torch.Tensor(valid_size, validDataTensor_ydim):zero()
-validDataTensor_len = torch.Tensor(valid_size):zero()
-testDataTensor = torch.Tensor(test_size, testDataTensor_ydim):zero()
-testDataTensor_len = torch.Tensor(test_size):zero()
-trainDataTensor_lstm_fwd = torch.Tensor(math.ceil(train_size/opt.batchSize)*opt.batchSize, trainDataTensor_ydim):zero()
-trainDataTensor_lstm_bwd = torch.Tensor(math.ceil(train_size/opt.batchSize)*opt.batchSize, trainDataTensor_ydim):zero()
-validDataTensor_lstm_fwd = torch.Tensor(valid_size, validDataTensor_ydim):zero()
-validDataTensor_lstm_bwd = torch.Tensor(valid_size, validDataTensor_ydim):zero()
-testDataTensor_lstm_fwd = torch.Tensor(test_size, testDataTensor_ydim):zero()
-testDataTensor_lstm_bwd = torch.Tensor(test_size, testDataTensor_ydim):zero()
+trainDataTensor = torch.Tensor(math.ceil(train_size/opt.batchSize)*opt.batchSize, trainDataTensor_ydim):fill(fillvalue)
+trainDataTensor_y = torch.Tensor(math.ceil(train_size/opt.batchSize)*opt.batchSize):fill(fillvalue)
+trainDataTensor_len = torch.Tensor(math.ceil(train_size/opt.batchSize)*opt.batchSize):fill(fillvalue)
+validDataTensor = torch.Tensor(valid_size, validDataTensor_ydim):fill(fillvalue)
+validDataTensor_len = torch.Tensor(valid_size):fill(fillvalue)
+testDataTensor = torch.Tensor(test_size, testDataTensor_ydim):fill(fillvalue)
+testDataTensor_len = torch.Tensor(test_size):fill(fillvalue)
+trainDataTensor_lstm_fwd = torch.Tensor(math.ceil(train_size/opt.batchSize)*opt.batchSize, trainDataTensor_ydim):fill(fillvalue)
+trainDataTensor_lstm_bwd = torch.Tensor(math.ceil(train_size/opt.batchSize)*opt.batchSize, trainDataTensor_ydim):fill(fillvalue)
+validDataTensor_lstm_fwd = torch.Tensor(valid_size, validDataTensor_ydim):fill(fillvalue)
+validDataTensor_lstm_bwd = torch.Tensor(valid_size, validDataTensor_ydim):fill(fillvalue)
+testDataTensor_lstm_fwd = torch.Tensor(test_size, testDataTensor_ydim):fill(fillvalue)
+testDataTensor_lstm_bwd = torch.Tensor(test_size, testDataTensor_ydim):fill(fillvalue)
 
 
 

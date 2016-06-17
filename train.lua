@@ -168,6 +168,10 @@ elseif opt.model == 12 then
    dofile 'model_cnn_depth9.lua'
 elseif opt.model == 13 then
    dofile 'model_cnn_depth5_spatial.lua'
+elseif opt.model == 14 then
+   dofile 'model_parallel_cnn_bigru.lua'
+elseif opt.model == 15 then
+   dofile 'model_parallel_cnn_birnn.lua'
 elseif opt.model == 16 then
    dofile 'model_cnn_cnn_cnn_bs1.lua'
 end

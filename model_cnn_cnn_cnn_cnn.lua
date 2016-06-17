@@ -11,7 +11,7 @@ if opt.dropout > 0 then
    cnn:add(nn.Dropout(opt.dropout))
 end
 if cudnnok then
-   conv = cudnn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
+   conv = cudnn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth, nil, 1)
 elseif fbok then
    conv = nn.TemporalConvolutionFB(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 else
@@ -38,7 +38,7 @@ end
 cnn:add(nn.ReLU())
 
 if cudnnok then
-   conv2 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
+   conv2 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, nil, 1)
 elseif fbok then
    conv2 = nn.TemporalConvolutionFB(opt.numFilters, opt.numFilters, opt.contConvWidth)
 else
@@ -65,7 +65,7 @@ cnn:add(nn.ReLU())
 --cnn:add(nn.TemporalMaxPooling(2))
 
 if cudnnok then
-   conv3 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
+   conv3 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, nil, 1)
 elseif fbok then
    conv3 = nn.TemporalConvolutionFB(opt.numFilters, opt.numFilters, opt.contConvWidth)
 else
@@ -92,7 +92,7 @@ cnn:add(nn.ReLU())
 
 
 if cudnnok then
-   conv4 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
+   conv4 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, nil, 1)
 elseif fbok then
    conv4 = nn.TemporalConvolutionFB(opt.numFilters, opt.numFilters, opt.contConvWidth)
 else

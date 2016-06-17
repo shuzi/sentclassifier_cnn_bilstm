@@ -87,15 +87,12 @@ if opt.conv3Norm then
   cnn:add(nn.JoinTable(1))
   cnn:add(nn.View(opt.batchSize, -1,opt.numFilters ))
 end
-
 cnn:add(nn.ReLU())
 
-
-
-
-
-cnn:add(nn.Max(2))
-cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))
+--cnn:add(nn.Max(2))
+cnn:add(nn.TopK(opt.topk,2,true,true))
+cnn:add(nn.View(opt.batchSize, -1))
+cnn:add(nn.Linear(opt.numFilters*opt.topk, opt.hiddenDim))
 if opt.lastReLU then
   cnn:add(nn.ReLU())
 else
@@ -104,7 +101,9 @@ end
 
 model = nn.Sequential()
 model:add(cnn)
---model:add(nn.Dropout(0.5))
+if opt.dropout > 0 then
+  model:add(nn.Dropout(opt.dropout))
+end
 --model:add(cudnn.BatchNormalization(opt.hiddenDim + 2*opt.LSTMhiddenSize))
 model:add(nn.Linear(opt.hiddenDim, opt.numLabels))
 model:add(nn.LogSoftMax())

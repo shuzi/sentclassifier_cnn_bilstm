@@ -50,6 +50,7 @@ elseif opt.LSTMmode == 6 then
   rnn_fwd:add(lstm_fwd)
   rnn_fwd:add(nn.Select(2,-1))
 end
+rnn_fwd:add(nn.ReLU())
 
 rnn_bwd = nn.Sequential()
 rnn_bwd:add(L_lstm_bwd)
@@ -92,6 +93,7 @@ elseif opt.LSTMmode == 6 then
   rnn_bwd:add(lstm_bwd)
   rnn_bwd:add(nn.Select(2,-1))
 end
+rnn_bwd:add(nn.ReLU())
 
 model = nn.Sequential()
 if opt.LSTMmode == 7 then

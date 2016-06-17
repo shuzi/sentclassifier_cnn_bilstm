@@ -81,6 +81,7 @@ elseif opt.LSTMmode == 6 then
   rnn_fwd:add(lstm_fwd)
   rnn_fwd:add(nn.Select(2,-1))
 end
+rnn_fwd:add(nn.ReLU())
 
 rnn_bwd = nn.Sequential()
 rnn_bwd:add(L_lstm_bwd)
@@ -123,6 +124,7 @@ elseif opt.LSTMmode == 6 then
   rnn_bwd:add(lstm_bwd)
   rnn_bwd:add(nn.Select(2,-1))
 end
+rnn_bwd:add(nn.ReLU())
 
 cnn_bilstm = nn.ParallelTable()
 if opt.LSTMmode == 7 then
@@ -142,9 +144,9 @@ model:add(cnn_bilstm)
 model:add(nn.JoinTable(2))
 --model:add(nn.Dropout(0.5))
 --model:add(cudnn.BatchNormalization(opt.hiddenDim + 2*opt.LSTMhiddenSize))
-model:add(nn.Linear(opt.numFilters + 2*opt.LSTMhiddenSize, opt.numFilters + 2*opt.LSTMhiddenSize))
+model:add(nn.Linear(opt.numFilters + 2*opt.LSTMhiddenSize, opt.hiddenDim))
 model:add(nn.ReLU())
-model:add(nn.Linear(opt.hiddenDim + 2*opt.LSTMhiddenSize, opt.numLabels))
+model:add(nn.Linear(opt.hiddenDim, opt.numLabels))
 model:add(nn.LogSoftMax())
 
 if opt.twoCriterion then
