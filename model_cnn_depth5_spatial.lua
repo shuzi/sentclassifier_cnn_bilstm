@@ -96,7 +96,7 @@ cnn:add(nn.ReLU())
 
 model = nn.Sequential()
 model:add(cnn)
-if opt.dropout > 0 
+if opt.dropout > 0 then
   model:add(nn.Dropout(opt.dropout))
 end
 
