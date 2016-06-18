@@ -21,45 +21,46 @@ else
 end
 cnn:add(conv)
 ------------------------------------------------------------------------------------------------------------
-cnn:add(nn.View(opt.batchSize, -1, 1, opt.embeddingDim))
-cnn:add(nn.Transpose({2,4}))
-if cudnnok then
-   conv2 = cudnn.SpatialConvolution(opt.embeddingDim, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv2)
-   cnn:add(cudnn.SpatialBatchNormalization(opt.numFilters))
-else
-   conv2 = nn.SpatialConvolution(opt.embeddingDim, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv2)
-   cnn:add(nn.SpatialBatchNormalization(opt.numFilters))
-end
-cnn:add(nn.Transpose({2,4}))
-cnn:add(nn.View(opt.batchSize, -1, opt.numFilters))
-cnn:add(nn.ReLU())
 cnn:add(nn.View(opt.batchSize, -1, 1, opt.numFilters))
 cnn:add(nn.Transpose({2,4}))
 if cudnnok then
+   conv2 = cudnn.SpatialConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
+   cnn:add(conv2)
+   cnn:add(nn.SpatialBatchNormalization(opt.numFilters))
+else
+   conv2 = nn.SpatialConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
+   cnn:add(conv2)
+   cnn:add(nn.SpatialBatchNormalization(opt.numFilters))
+end
+--cnn:add(nn.Transpose({2,4}))
+--cnn:add(nn.View(opt.batchSize, -1, opt.numFilters))
+cnn:add(nn.ReLU())
+--cnn:add(nn.View(opt.batchSize, -1, 1, opt.numFilters))
+--cnn:add(nn.Transpose({2,4}))
+if cudnnok then
    conv3 = cudnn.SpatialConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
    cnn:add(conv3)
-   cnn:add(cudnn.SpatialBatchNormalization(opt.numFilters))
+   cnn:add(nn.SpatialBatchNormalization(opt.numFilters))
 else
    conv3 = nn.SpatialConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
    cnn:add(conv3)
    cnn:add(nn.SpatialBatchNormalization(opt.numFilters))
 end
-cnn:add(nn.Transpose({2,4}))
-cnn:add(nn.View(opt.batchSize, -1, opt.numFilters))
+--cnn:add(nn.Transpose({2,4}))
+--cnn:add(nn.View(opt.batchSize, -1, opt.numFilters))
 cnn:add(nn.ReLU())
 ------------------------------------------------------------------------------------------------------------
 
 conv4_filters = opt.numFilters
 if opt.TMP then
-  cnn:add(nn.TemporalMaxPooling(opt.contConvWidth, opt.contConvWidth-1))
+--  cnn:add(nn.TemporalMaxPooling(opt.contConvWidth, opt.contConvWidth-1))
+  cnn:add(nn.SpatialMaxPooling(opt.contConvWidth, 1, opt.contConvWidth-1, 1, 0, 0))
   conv4_filters=opt.numFilters*2
 end
 conv5_filters = conv4_filters
 ------------------------------------------------------------------------------------------------------------
-cnn:add(nn.View(opt.batchSize, -1, 1, opt.numFilters))
-cnn:add(nn.Transpose({2,4}))
+--cnn:add(nn.View(opt.batchSize, -1, 1, opt.numFilters))
+--cnn:add(nn.Transpose({2,4}))
 if cudnnok then
    conv4 = cudnn.SpatialConvolution(opt.numFilters, conv4_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
    cnn:add(conv4)
@@ -69,11 +70,11 @@ else
    cnn:add(conv4)
    cnn:add(nn.SpatialBatchNormalization(conv4_filters))
 end
-cnn:add(nn.Transpose({2,4}))
-cnn:add(nn.View(opt.batchSize, -1, conv4_filters))
+--cnn:add(nn.Transpose({2,4}))
+--cnn:add(nn.View(opt.batchSize, -1, conv4_filters))
 cnn:add(nn.ReLU())
-cnn:add(nn.View(opt.batchSize, -1, 1, conv4_filters))
-cnn:add(nn.Transpose({2,4}))
+--cnn:add(nn.View(opt.batchSize, -1, 1, conv4_filters))
+--cnn:add(nn.Transpose({2,4}))
 if cudnnok then
    conv5 = cudnn.SpatialConvolution(conv4_filters, conv5_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
    cnn:add(conv5)
