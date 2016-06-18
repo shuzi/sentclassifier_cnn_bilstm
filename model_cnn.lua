@@ -6,7 +6,7 @@ L_cnn.weight:sub(2,-1):copy(mapWordIdx2Vector)
 cnn = nn.Sequential()
 cnn:add(L_cnn)
 if opt.dropout > 0 then
-   cnn:add(nn.Dropout(opt.dropout))
+--   cnn:add(nn.Dropout(opt.dropout))
 end
 if cudnnok then
    conv = cudnn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
@@ -28,7 +28,9 @@ end
 
 model = nn.Sequential()
 model:add(cnn)
---model:add(nn.Dropout(0.5))
+if opt.dropout> 0 then
+  model:add(nn.Dropout(opt.dropout))
+end
 --model:add(cudnn.BatchNormalization(opt.hiddenDim + 2*opt.LSTMhiddenSize))
 model:add(nn.Linear(opt.hiddenDim, opt.numLabels))
 model:add(nn.LogSoftMax())
