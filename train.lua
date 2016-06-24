@@ -132,12 +132,12 @@ end
 if opt.type == 'cuda' then
   trainDataTensor =  trainDataTensor:cuda()
   trainDataTensor_y =  trainDataTensor_y:cuda()
-  --trainDataTensor_lstm_fwd = trainDataTensor_lstm_fwd:cuda()
-  --trainDataTensor_lstm_bwd = trainDataTensor_lstm_bwd:cuda()
-  --validDataTensor_lstm_fwd = validDataTensor_lstm_fwd:cuda()
- -- validDataTensor_lstm_bwd = validDataTensor_lstm_bwd:cuda()
- -- testDataTensor_lstm_fwd = testDataTensor_lstm_fwd:cuda()
- -- testDataTensor_lstm_bwd = testDataTensor_lstm_bwd:cuda()
+  trainDataTensor_lstm_fwd = trainDataTensor_lstm_fwd:cuda()
+  trainDataTensor_lstm_bwd = trainDataTensor_lstm_bwd:cuda()
+  validDataTensor_lstm_fwd = validDataTensor_lstm_fwd:cuda()
+  validDataTensor_lstm_bwd = validDataTensor_lstm_bwd:cuda()
+  testDataTensor_lstm_fwd = testDataTensor_lstm_fwd:cuda()
+  testDataTensor_lstm_bwd = testDataTensor_lstm_bwd:cuda()
   validDataTensor = validDataTensor:cuda()
   testDataTensor = testDataTensor:cuda()
 end

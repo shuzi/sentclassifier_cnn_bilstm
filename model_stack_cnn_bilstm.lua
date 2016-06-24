@@ -8,7 +8,7 @@ LSTM_bwd = nn.Sequencer(nn.FastLSTM(opt.numFilters, opt.LSTMhiddenSize):trimZero
 cnn = nn.Sequential()
 cnn:add(L_cnn)
 if opt.dropout > 0 then
-   cnn:add(nn.Dropout(opt.dropout))
+ --  cnn:add(nn.Dropout(opt.dropout))
 end
 --cnn:add(nn.View(opt.batchSize*trainDataTensor:size()[2], opt.embeddingDim))
 --cnn:add(nn.Linear(opt.embeddingDim, opt.wordHiddenDim))
@@ -30,7 +30,7 @@ end
 
 rnn_fwd = nn.Sequential()
 if opt.dropout > 0 then
-  rnn_fwd:add(nn.Dropout(opt.dropout))
+ -- rnn_fwd:add(nn.Dropout(opt.dropout))
 end
 if opt.LSTMmode == 1 then
   rnn_fwd:add(nn.SplitTable(1,2))
@@ -74,7 +74,7 @@ if opt.LSTMmode ~= 7 then
   rnn_bwd:add(nn.SeqReverseSequence(2))
 end
 if opt.dropout > 0 then
-  rnn_bwd:add(nn.Dropout(opt.dropout))
+  --rnn_bwd:add(nn.Dropout(opt.dropout))
 end
 if opt.LSTMmode == 1 then
   rnn_bwd:add(nn.SplitTable(1,2))
@@ -131,10 +131,13 @@ model:add(bilstm)
 if opt.LSTMmode ~= 7 then
    model:add(nn.JoinTable(2))
 end
---model:add(nn.Dropout(0.5))
+
 --model:add(cudnn.BatchNormalization(opt.hiddenDim + 2*opt.LSTMhiddenSize))
 model:add(nn.Linear(2*opt.LSTMhiddenSize, 2*opt.LSTMhiddenSize))
 model:add(nn.ReLU())
+if opt.dropout > 0 then
+  model:add(nn.Dropout(opt.dropout))
+end
 model:add(nn.Linear(2*opt.LSTMhiddenSize, opt.numLabels))
 model:add(nn.LogSoftMax())
 

@@ -12,7 +12,7 @@ LSTM_bwd = nn.Sequencer(nn.FastLSTM(opt.embeddingDim, opt.LSTMhiddenSize):trimZe
 rnn_fwd = nn.Sequential()
 rnn_fwd:add(L_lstm_fwd)
 if opt.dropout > 0 then
-  rnn_fwd:add(nn.Dropout(opt.dropout))
+ -- rnn_fwd:add(nn.Dropout(opt.dropout))
 end
 if opt.LSTMmode == 1 then
   rnn_fwd:add(nn.SplitTable(1,2))
@@ -48,7 +48,7 @@ end
 rnn_bwd = nn.Sequential()
 rnn_bwd:add(L_lstm_bwd)
 if opt.dropout > 0 then
-  rnn_bwd:add(nn.Dropout(opt.dropout))
+ -- rnn_bwd:add(nn.Dropout(opt.dropout))
 end
 if opt.LSTMmode == 1 then
   rnn_bwd:add(nn.SplitTable(1,2))
@@ -91,7 +91,7 @@ end
 
 cnn = nn.Sequential()
 if opt.dropout > 0 then
-   cnn:add(nn.Dropout(opt.dropout))
+ --  cnn:add(nn.Dropout(opt.dropout))
 end
 if cudnnok then
    conv = cudnn.TemporalConvolution(2*opt.LSTMhiddenSize, opt.numFilters, opt.contConvWidth)
@@ -120,6 +120,9 @@ if opt.LSTMmode ~= 7 then
    model:add(nn.JoinTable(3))
 end
 model:add(cnn)
+if opt.dropout > 0 then
+   model:add(nn.Dropout(opt.dropout))
+end
 model:add(nn.Linear(opt.hiddenDim, opt.numLabels))
 model:add(nn.LogSoftMax())
 

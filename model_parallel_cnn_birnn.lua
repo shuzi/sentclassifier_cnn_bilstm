@@ -12,7 +12,7 @@ L_rnn_bwd.gradWeight = L_cnn.gradWeight
 cnn = nn.Sequential()
 cnn:add(L_cnn)
 if opt.dropout > 0 then
-   cnn:add(nn.Dropout(opt.dropout))
+ --  cnn:add(nn.Dropout(opt.dropout))
 end
 
 if cudnnok then
@@ -38,7 +38,7 @@ end
 rnn_fwd = nn.Sequential()
 rnn_fwd:add(L_rnn_fwd)
 if opt.dropout > 0 then
-  rnn_fwd:add(nn.Dropout(opt.dropout))
+ -- rnn_fwd:add(nn.Dropout(opt.dropout))
 end  
 if opt.rnnTanh then
   rnn_fwd:add(cudnn.RNNTanh(opt.embeddingDim, opt.RNNhiddenSize, 1, true))
@@ -53,7 +53,7 @@ rnn_fwd:add(nn.ReLU())
 rnn_bwd = nn.Sequential()
 rnn_bwd:add(L_rnn_bwd)
 if opt.dropout > 0 then
-  rnn_bwd:add(nn.Dropout(opt.dropout))
+  --rnn_bwd:add(nn.Dropout(opt.dropout))
 end
 if opt.rnnTanh then
   rnn_bwd:add(cudnn.RNNTanh(opt.embeddingDim, opt.RNNhiddenSize, 1, true))
@@ -73,6 +73,9 @@ model:add(nn.JoinTable(2))
 
 model:add(nn.Linear(opt.numFilters + 2*opt.RNNhiddenSize, opt.hiddenDim))
 model:add(nn.ReLU())
+if opt.dropout > 0 then
+  model:add(nn.Dropout(opt.dropout))
+end
 model:add(nn.Linear(opt.hiddenDim, opt.numLabels))
 model:add(nn.LogSoftMax())
 
@@ -242,6 +245,7 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
     local batches = inputDataTensor:size()[1]/bs
     local correct = 0
     local correct2 = 0
+    local correct3 = 0
     local curr = -1
     for t = 1,batches,1 do
         curr = t
@@ -272,6 +276,12 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
           for k,v in ipairs(inputTarget[begin+m-1]) do
             if torch.abs(pos[m][1] - v) < 2 then
               correct2 = correct2 + 1
+              break
+            end
+          end
+          for k,v in ipairs(inputTarget[begin+m-1]) do
+            if torch.abs(pos[m][1] - v) < 3 then
+              correct3 = correct3 + 1
               break
             end
           end
@@ -321,6 +331,12 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
                 break
             end
           end
+          for k,v in ipairs(inputTarget[curr*bs+m]) do
+            if torch.abs(pos[m][1] - v) < 3 then
+                correct3 = correct3 + 1
+                break
+            end
+          end
        end
     end
      
@@ -328,11 +344,16 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
     state.bestEpoch = state.bestEpoch or 0
     state.bestAccuracy2 = state.bestAccuracy2 or 0
     state.bestEpoch2 = state.bestEpoch2 or 0
+    state.bestAccuracy3 = state.bestAccuracy3 or 0
+    state.bestEpoch3 = state.bestEpoch3 or 0
     local currAccuracy = correct/(inputDataTensor:size()[1])
     local currAccuracy2 = correct2/(inputDataTensor:size()[1])
+    local currAccuracy3 = correct3/(inputDataTensor:size()[1])
     if currAccuracy > state.bestAccuracy then state.bestAccuracy = currAccuracy; state.bestEpoch = epoch end
     if currAccuracy2 > state.bestAccuracy2 then state.bestAccuracy2 = currAccuracy2; state.bestEpoch2 = epoch end
+    if currAccuracy3 > state.bestAccuracy3 then state.bestAccuracy3 = currAccuracy3; state.bestEpoch3 = epoch end
     print(string.format("Epoch %s Accuracy: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy, state.bestAccuracy, state.bestEpoch, sys.toc() ))
     print(string.format("Epoch %s Accuracy2: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy2, state.bestAccuracy2, state.bestEpoch2, sys.toc() ))
+    print(string.format("Epoch %s Accuracy3: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy3, state.bestAccuracy3, state.bestEpoch3, sys.toc() ))
 end
 
