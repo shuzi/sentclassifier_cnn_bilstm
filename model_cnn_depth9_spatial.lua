@@ -342,6 +342,7 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
     local batches = inputDataTensor:size()[1]/bs
     local correct = 0
     local correct2 = 0
+    local correct3 = 0
     local curr = -1
     if cudnnok then
       conv_nodes = model:findModules('cudnn.TemporalConvolution')
@@ -376,6 +377,12 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
           for k,v in ipairs(inputTarget[begin+m-1]) do
             if torch.abs(pos[m][1] - v) < 2 then
               correct2 = correct2 + 1
+              break
+            end
+          end 
+          for k,v in ipairs(inputTarget[begin+m-1]) do
+            if torch.abs(pos[m][1] - v) < 3 then
+              correct3 = correct3 + 1
               break
             end
           end 
@@ -421,6 +428,12 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
                 break
             end
           end
+          for k,v in ipairs(inputTarget[curr*bs+m]) do
+            if torch.abs(pos[m][1] - v) < 3 then
+                correct3 = correct3 + 1
+                break
+            end
+          end
        end
     end
      
@@ -428,11 +441,16 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
     state.bestEpoch = state.bestEpoch or 0
     state.bestAccuracy2 = state.bestAccuracy2 or 0
     state.bestEpoch2 = state.bestEpoch2 or 0
+    state.bestAccuracy3 = state.bestAccuracy3 or 0
+    state.bestEpoch3 = state.bestEpoch3 or 0
     local currAccuracy = correct/(inputDataTensor:size()[1])
     local currAccuracy2 = correct2/(inputDataTensor:size()[1])
+    local currAccuracy3 = correct3/(inputDataTensor:size()[1])
     if currAccuracy > state.bestAccuracy then state.bestAccuracy = currAccuracy; state.bestEpoch = epoch end
     if currAccuracy2 > state.bestAccuracy2 then state.bestAccuracy2 = currAccuracy2; state.bestEpoch2 = epoch end
+    if currAccuracy3 > state.bestAccuracy3 then state.bestAccuracy3 = currAccuracy3; state.bestEpoch3 = epoch end
     print(string.format("Epoch %s Accuracy: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy, state.bestAccuracy, state.bestEpoch, sys.toc() ))
     print(string.format("Epoch %s Accuracy2: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy2, state.bestAccuracy2, state.bestEpoch2, sys.toc() ))
+    print(string.format("Epoch %s Accuracy3: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy3, state.bestAccuracy3, state.bestEpoch3, sys.toc() )) 
 end
 
