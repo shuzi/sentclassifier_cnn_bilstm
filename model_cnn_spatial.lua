@@ -1,163 +1,42 @@
 dofile('optim-rmsprop-single.lua')
-dofile('MapTable.lua')
 
 L_cnn = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
 L_cnn.weight:sub(2,-1):copy(mapWordIdx2Vector)
 
-
 cnn = nn.Sequential()
 cnn:add(L_cnn)
-
-
-
-if cudnnok then
-   conv = cudnn.TemporalConvolution(opt.embeddingDim, opt.numFilters, opt.contConvWidth)
-elseif fbok then
-   conv = nn.TemporalConvolutionFB(opt.embeddingDim, opt.numFilters, opt.contConvWidth)
-else
-   conv = nn.TemporalConvolution(opt.embeddingDim, opt.numFilters, opt.contConvWidth)
-end
-cnn:add(conv)
-------------------------------------------------------------------------------------------------------------
-cnn:add(nn.View(opt.batchSize, -1, 1, opt.numFilters))
+cnn:add(nn.View(opt.batchSize, -1, 1, opt.wordHiddenDim))
 cnn:add(nn.Transpose({2,4}))
-if cudnnok then
-   conv2 = cudnn.SpatialConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv2)
-   cnn:add(nn.SpatialBatchNormalization(opt.numFilters))
-else
-   conv2 = nn.SpatialConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv2)
-   cnn:add(nn.SpatialBatchNormalization(opt.numFilters))
-end
-
-cnn:add(nn.ReLU())
 
 if cudnnok then
-   conv3 = cudnn.SpatialConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv3)
+   conv = cudnn.SpatialConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
+   cnn:add(conv)
    cnn:add(nn.SpatialBatchNormalization(opt.numFilters))
 else
-   conv3 = nn.SpatialConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv3)
+   conv = nn.SpatialConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth, 1, 1, 1, 0, 0)
+   cnn:add(conv)
    cnn:add(nn.SpatialBatchNormalization(opt.numFilters))
 end
 
 cnn:add(nn.ReLU())
-------------------------------------------------------------------------------------------------------------
-
-conv4_filters = opt.numFilters
-if opt.TMP then
---  cnn:add(nn.TemporalMaxPooling(opt.contConvWidth, opt.contConvWidth-1))
-  cnn:add(nn.SpatialMaxPooling(opt.contConvWidth, 1, opt.contConvWidth-1, 1, 0, 0))
-  conv4_filters=opt.numFilters*2
-end
-conv5_filters = conv4_filters
-------------------------------------------------------------------------------------------------------------
-
-if cudnnok then
-   conv4 = cudnn.SpatialConvolution(opt.numFilters, conv4_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv4)
-   cnn:add(cudnn.SpatialBatchNormalization(conv4_filters))
-else
-   conv4 = nn.SpatialConvolution(opt.numFilters, conv4_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv4)
-   cnn:add(nn.SpatialBatchNormalization(conv4_filters))
-end
-cnn:add(nn.ReLU())
-
-if cudnnok then
-   conv5 = cudnn.SpatialConvolution(conv4_filters, conv5_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv5)
-   cnn:add(cudnn.SpatialBatchNormalization(conv5_filters))
-else
-   conv5 = nn.SpatialConvolution(conv4_filters, conv5_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv5)
-   cnn:add(nn.SpatialBatchNormalization(conv5_filters))
-end
-cnn:add(nn.ReLU())
-
-------------------------------------------------------------------------------------------------------------
-
-conv6_filters = opt.numFilters
-if opt.TMP then
-  cnn:add(nn.SpatialMaxPooling(opt.contConvWidth, 1, opt.contConvWidth-1, 1, 0, 0))
-  conv6_filters=opt.numFilters*4
-end
-conv7_filters = conv6_filters
-------------------------------------------------------------------------------------------------------------
-
-
-if cudnnok then
-   conv6 = cudnn.SpatialConvolution(conv5_filters, conv6_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv6)
-   cnn:add(cudnn.SpatialBatchNormalization(conv6_filters))
-else
-   conv6 = nn.SpatialConvolution(conv5_filters, conv6_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv6)
-   cnn:add(nn.SpatialBatchNormalization(conv6_filters))
-end
-cnn:add(nn.ReLU())
-
-if cudnnok then
-   conv7 = cudnn.SpatialConvolution(conv6_filters, conv7_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv7)
-   cnn:add(cudnn.SpatialBatchNormalization(conv7_filters))
-else
-   conv5 = nn.SpatialConvolution(conv6_filters, conv7_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv7)
-   cnn:add(nn.SpatialBatchNormalization(conv7_filters))
-end
-cnn:add(nn.ReLU())
-
-------------------------------------------------------------------------------------------------------------
-conv8_filters = opt.numFilters
-if opt.TMP then
-  cnn:add(nn.SpatialMaxPooling(opt.contConvWidth, 1, opt.contConvWidth-1, 1, 0, 0))
-  conv8_filters=opt.numFilters*8
-end
-conv9_filters = conv8_filters
-------------------------------------------------------------------------------------------------------------
-if cudnnok then
-   conv8 = cudnn.SpatialConvolution(conv7_filters, conv8_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv8)
-   cnn:add(cudnn.SpatialBatchNormalization(conv8_filters))
-else
-   conv8 = nn.SpatialConvolution(conv7_filters, conv8_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv8)
-   cnn:add(nn.SpatialBatchNormalization(conv8_filters))
-end
-cnn:add(nn.ReLU())
-
-if cudnnok then
-   conv9 = cudnn.SpatialConvolution(conv8_filters, conv9_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv9)
-   cnn:add(cudnn.SpatialBatchNormalization(conv9_filters))
-else
-   conv9 = nn.SpatialConvolution(conv8_filters, conv9_filters, opt.contConvWidth, 1, 1, 1, 0, 0)
-   cnn:add(conv9)
-   cnn:add(nn.SpatialBatchNormalization(conv9_filters))
-end
-cnn:add(nn.ReLU())
-
 cnn:add(nn.Transpose({2,4}))
-cnn:add(nn.View(opt.batchSize, -1, conv9_filters))
+cnn:add(nn.View(opt.batchSize, -1, opt.numFilters))
 
-------------------------------------------------------------------------------------------------------------
-
-cnn:add(nn.TopK(opt.topk, 2, true, true))
-cnn:add(nn.View(opt.batchSize, -1))
-cnn:add(nn.Linear(conv9_filters*opt.topk, opt.hiddenDim))
-cnn:add(nn.ReLU())
-cnn:add(nn.Linear(opt.hiddenDim, opt.hiddenDim))
-cnn:add(nn.ReLU())
+--cnn:add(nn.AddConstantNeg(-20000))
+cnn:add(nn.Max(2))
+cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))
+if opt.lastReLU then
+  cnn:add(nn.ReLU())
+else
+  cnn:add(nn.Tanh())
+end
 
 model = nn.Sequential()
 model:add(cnn)
-if opt.dropout > 0 then
+if opt.dropout> 0 then
   model:add(nn.Dropout(opt.dropout))
 end
-
+--model:add(cudnn.BatchNormalization(opt.hiddenDim + 2*opt.LSTMhiddenSize))
 model:add(nn.Linear(opt.hiddenDim, opt.numLabels))
 model:add(nn.LogSoftMax())
 
@@ -204,7 +83,7 @@ elseif opt.optimization == 'sgd' then
     optimState = {
       lr = opt.learningRate,
       lrd = opt.weightDecay,
-      mom = opt.momentum,
+      mom = opt.momentum
    }
    optimMethod = optim.msgd
 elseif opt.optimization == 'SGD' then
@@ -263,7 +142,6 @@ function train()
 --    optimState.learningRate = opt.learningRate
     local time = sys.clock()
     model:training()
-   
     local batches = trainDataTensor:size()[1]/opt.batchSize
     local bs = opt.batchSize
     shuffle = torch.randperm(batches)
@@ -273,21 +151,7 @@ function train()
         local target = trainDataTensor_y:narrow(1, begin , bs)
         local input_lstm_fwd = trainDataTensor_lstm_fwd:narrow(1, begin , bs)
         local input_lstm_bwd = trainDataTensor_lstm_bwd:narrow(1, begin , bs)
-
-        if cudnnok then
-          conv_nodes = model:findModules('cudnn.TemporalConvolution')
-        else
-          conv_nodes = model:findModules('nn.TemporalConvolution')
-        end
-        for i = 1, #conv_nodes do
-          conv_nodes[i].bias:fill(0)
-        end
-        
-   --     print(conv_nodes)
-   --     print(container_nodes)
-   --     model:get(1):get(2).bias:fill(0)
-   --     model:get(1):get(4).bias:fill(0)
-        
+       
         
         local feval = function(x)
             if x ~= parameters then
@@ -345,14 +209,6 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
     local correct2 = 0
     local correct3 = 0
     local curr = -1
-    if cudnnok then
-      conv_nodes = model:findModules('cudnn.TemporalConvolution')
-    else
-      conv_nodes = model:findModules('nn.TemporalConvolution')
-    end
-    for i = 1, #conv_nodes do
-       conv_nodes[i].bias:fill(0)
-    end
     for t = 1,batches,1 do
         curr = t
         local begin = (t - 1)*bs + 1
@@ -386,7 +242,7 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
               correct3 = correct3 + 1
               break
             end
-          end 
+          end
         end     
     end
 

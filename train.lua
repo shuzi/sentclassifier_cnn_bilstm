@@ -178,6 +178,8 @@ elseif opt.model == 16 then
    dofile 'model_cnn_cnn_cnn_bs1.lua'
 elseif opt.model == 17 then
    dofile 'model_cnn_depth9_spatial.lua'
+elseif opt.model == 18 then
+   dofile 'model_cnn_spatial.lua'
 end
 collectgarbage()
 collectgarbage()
