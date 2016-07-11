@@ -180,10 +180,11 @@ elseif opt.model == 17 then
    dofile 'model_cnn_depth9_spatial.lua'
 elseif opt.model == 18 then
    dofile 'model_cnn_spatial.lua'
+elseif opt.model == 19 then
+   dofile 'model_cnn_highway.lua'
 end
 collectgarbage()
 collectgarbage()
-
 
 sys.tic()
 epoch = 1
