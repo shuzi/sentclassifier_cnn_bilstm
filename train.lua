@@ -182,6 +182,8 @@ elseif opt.model == 18 then
    dofile 'model_cnn_spatial.lua'
 elseif opt.model == 19 then
    dofile 'model_cnn_highway.lua'
+elseif opt.model == 20 then
+   dofile 'model_cnn_highway_nngraph.lua'
 end
 collectgarbage()
 collectgarbage()

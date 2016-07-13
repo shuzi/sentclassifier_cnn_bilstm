@@ -1,34 +1,18 @@
 dofile('optim-rmsprop-single.lua')
+require 'nngraph'
 
-model = nn.Sequential()
-L_cnn = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
-L_cnn.weight:sub(2,-1):copy(mapWordIdx2Vector)
-model:add(L_cnn)
-model:add(nn.View(-1, opt.embeddingDim))
-model:add(nn.Linear(opt.embeddingDim, opt.highwayDim))
-model:add(nn.View(opt.batchSize, -1, opt.highwayDim))
+lookup = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)()
+lookup.data.module.weight:sub(2,-1):copy(mapWordIdx2Vector)
 
-model:add(nn.View(opt.batchSize, -1, 1, opt.highwayDim))
-model:add(nn.Transpose({2,4}))
+transdim = nn.View(opt.batchSize, -1, opt.highwayDim)(nn.Linear(opt.embeddingDim, opt.highwayDim)(nn.View(-1, opt.embeddingDim)(lookup)))
+transdim2 = nn.Transpose({2,4})(nn.View(opt.batchSize, -1, 1, opt.highwayDim)(transdim))
+
 pw = opt.contConvWidth - 1 - 2*opt.padW
+local inputone = nn.Identity()(transdim2)
+local inputs = {[1]=inputone}
+
 
 for i = 1, opt.hwlayers do
-  t_layer =  nn.Sequential()
-  t_layer:add(nn.AddConstant(opt.tgbias))
-  t_layer:add(nn.Sigmoid())
-  t_layer:add(nn.Padding(4, pw))
-
-  c_layer =  nn.Sequential()
-  c_layer:add(nn.AddConstant(opt.tgbias))
-  c_layer:add(nn.Sigmoid())
-  c_layer:add(nn.Padding(4, pw))
-  c_layer:add(nn.MulConstant(-1))
-  c_layer:add(nn.AddConstant(1))
-  
-  p_layer = nn.Sequential() 
-  p_layer:add(nn.ReLU())
-  p_layer:add(nn.Padding(4, pw))
-  
   if cudnnok then
     conv = cudnn.SpatialConvolution(opt.highwayDim, opt.highwayDim, opt.contConvWidth, 1, 1, 1, opt.padW, 0)
   else
@@ -36,43 +20,31 @@ for i = 1, opt.hwlayers do
   end
   conv.weight:uniform(-0.01, 0.01)
   conv.bias:zero()
-  model:add(nn.ConcatTable():add(conv):add(nn.Identity()))
-  model:add(nn.ParallelTable():add(nn.ConcatTable():add(p_layer):add(t_layer):add(c_layer) ):add(nn.Identity()))
-  model:add(nn.FlattenTable())
-  model:add(nn.ConcatTable():add(nn.NarrowTable(1,2)):add(nn.NarrowTable(3,2)))
-  model:add(nn.ParallelTable():add(nn.CMulTable()):add(nn.CMulTable()))
-  model:add(nn.CAddTable())
+  
+  output = nn.Padding(4, pw)(nn.ReLU()(conv(inputs[i])))
+  transform_gate = nn.Padding(4, pw)(nn.Sigmoid()(nn.AddConstant(opt.tgbias)(conv(inputs[i]))))
+  carry_gate = nn.AddConstant(1)(nn.MulConstant(-1)(transform_gate))
+  
+  out = nn.CAddTable()({
+      nn.CMulTable()({transform_gate, output}),
+      nn.CMulTable()({carry_gate, inputs[i]})  })
+  table.insert(inputs, out)
+
 end
 
-
---model:add(nn.ReLU())
-model:add(nn.Transpose({2,4}))
-model:add(nn.View(opt.batchSize, -1, opt.highwayDim))
-
-model:add(nn.TopK(opt.topk, 2, true, true))
-model:add(nn.View(opt.batchSize, -1))
-model:add(nn.Linear(opt.highwayDim*opt.topk, opt.hiddenDim))
-model:add(nn.ReLU())
-
+convback = nn.View(opt.batchSize, -1, opt.highwayDim)(nn.Transpose({2,4})(inputs[opt.hwlayers+1]))
+topk = nn.View(opt.batchSize, -1)(nn.TopK(opt.topk, 2, true, true)(convback))
+node = nn.ReLU()(nn.Linear(opt.highwayDim*opt.topk, opt.hiddenDim)(topk))
 
 if opt.dropout> 0 then
-  model:add(nn.Dropout(opt.dropout))
+  node = nn.Dropout(opt.dropout)(node)
 end
-model:add(nn.Linear(opt.hiddenDim, opt.numLabels))
-model:add(nn.LogSoftMax())
 
-if opt.twoCriterion then
-  prob_idx = nn.ConcatTable()
-  prob_idx:add(nn.Identity())
-  prob_idx:add(nn.ArgMax(2,opt.numLabels, false))
-  model:add(prob_idx)
+prob = nn.LogSoftMax()(nn.Linear(opt.hiddenDim, opt.numLabels)(node))
 
-  nll = nn.ClassNLLCriterion()
-  abs = nn.AbsCriterion()
-  criterion = nn.ParallelCriterion(true):add(nll, opt.criterionWeight):add(abs)
-else
-  criterion = nn.ClassNLLCriterion()
-end
+model = nn.gModule({lookup},{prob})
+
+criterion = nn.ClassNLLCriterion()
 
 
 if opt.type == 'cuda' then
