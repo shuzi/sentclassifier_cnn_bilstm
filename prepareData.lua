@@ -302,6 +302,22 @@ for line in io.lines(opt.testFile) do
     end
 end
 
+if opt.saveBin then
+   torch.save('mapWordIdx2Vector', mapWordIdx2Vector)
+   torch.save('trainDataTensor', trainDataTensor)
+   torch.save('trainDataTensor_y',trainDataTensor_y)
+   torch.save('trainDataTensor_lstm_fwd', trainDataTensor_lstm_fwd)
+   torch.save('trainDataTensor_lstm_bwd', trainDataTensor_lstm_bwd)
+   torch.save('validDataTensor', validDataTensor)
+   torch.save('validDataTensor_lstm_fwd', validDataTensor_lstm_fwd)
+   torch.save('validDataTensor_lstm_bwd', validDataTensor_lstm_bwd)
+   torch.save('validDataTensor_y', validDataTensor_y)
+   torch.save('testDataTensor', testDataTensor)
+   torch.save('testDataTensor_lstm_fwd', testDataTensor_lstm_fwd)
+   torch.save('testDataTensor_lstm_bwd', testDataTensor_lstm_bwd)
+   torch.save('testDataTensor_y', testDataTensor_y)
+end
+
 
 print(string.format('training data size: %s x %s', trainDataTensor:size()[1], trainDataTensor:size()[2]))
 print(string.format('training data size: %s x %s', trainDataTensor_lstm_fwd:size()[1], trainDataTensor_lstm_fwd:size()[2]))

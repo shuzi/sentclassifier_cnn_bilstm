@@ -1,6 +1,7 @@
 dofile('optim-rmsprop-single.lua')
 require 'nngraph'
 
+
 lookup = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)()
 lookup.data.module.weight:sub(2,-1):copy(mapWordIdx2Vector)
 
@@ -140,8 +141,10 @@ function train()
     shuffle = torch.randperm(batches)
     for t = 1,batches,1 do
         local begin = (shuffle[t] - 1)*bs + 1
-        local input = trainDataTensor:narrow(1, begin , bs) 
-        local target = trainDataTensor_y:narrow(1, begin , bs)
+ --       local input = trainDataTensor:narrow(1, begin , bs) 
+ --       local target = trainDataTensor_y:narrow(1, begin , bs)
+        local input = opt.dataoncpu and trainDataTensor:narrow(1, begin , bs):cuda() or trainDataTensor:narrow(1, begin , bs)
+        local target = opt.dataoncpu and trainDataTensor_y:narrow(1, begin , bs):cuda() or trainDataTensor_y:narrow(1, begin , bs)
         local input_lstm_fwd = trainDataTensor_lstm_fwd:narrow(1, begin , bs)
         local input_lstm_bwd = trainDataTensor_lstm_bwd:narrow(1, begin , bs)
        
@@ -205,7 +208,8 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
     for t = 1,batches,1 do
         curr = t
         local begin = (t - 1)*bs + 1
-        local input = inputDataTensor:narrow(1, begin , bs)
+        --local input = inputDataTensor:narrow(1, begin , bs)
+        local input = opt.dataoncpu and inputDataTensor:narrow(1, begin , bs):cuda() or inputDataTensor:narrow(1, begin , bs)
         local input_lstm_fwd = inputDataTensor_lstm_fwd:narrow(1, begin , bs)
         local input_lstm_bwd = inputDataTensor_lstm_bwd:narrow(1, begin , bs)
         local pred        

@@ -39,7 +39,7 @@ if opt.type == 'cuda' then
      require 'cudnn'
      cudnn.fastest = true
      cudnn.benchmark = true
-     cudnn.verbose = true
+ --    cudnn.verbose = true
   end
 else
    fbok = false
@@ -122,7 +122,7 @@ if opt.loadBin then
   testDataTensor_lstm_bwd = torch.load('testDataTensor_lstm_bwd')
   testDataTensor_y = torch.load('testDataTensor_y')
 else
-  if opt.model < 10 then
+  if opt.model < 30 then
     dofile 'prepareData.lua'
   else
     dofile 'prepareData_nopadding.lua'
@@ -130,10 +130,12 @@ else
 end
 
 if opt.type == 'cuda' then
-  trainDataTensor =  trainDataTensor:cuda()
-  trainDataTensor_y =  trainDataTensor_y:cuda()
-  validDataTensor = validDataTensor:cuda()
-  testDataTensor = testDataTensor:cuda()
+  if not opt.dataoncpu then
+    trainDataTensor =  trainDataTensor:cuda()
+    trainDataTensor_y =  trainDataTensor_y:cuda()
+    validDataTensor = validDataTensor:cuda()
+    testDataTensor = testDataTensor:cuda()
+  end
   if opt.alloncuda then
     trainDataTensor_lstm_fwd = trainDataTensor_lstm_fwd:cuda()
     trainDataTensor_lstm_bwd = trainDataTensor_lstm_bwd:cuda()
@@ -184,6 +186,8 @@ elseif opt.model == 19 then
    dofile 'model_cnn_highway.lua'
 elseif opt.model == 20 then
    dofile 'model_cnn_highway_nngraph.lua'
+elseif opt.model == 21 then
+   dofile 'model_bilstmattn.lua'
 end
 collectgarbage()
 collectgarbage()

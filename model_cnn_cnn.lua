@@ -1,12 +1,22 @@
 dofile('optim-rmsprop-single.lua')
 
+function MSRinit(model)
+   for k,v in pairs(model:findModules('cudnn.TemporalConvolution')) do
+      print("!!!!!!!!!!!!")
+      local n = v.kW*v.kH*v.nInputPlane
+      v.weight:normal(0,math.sqrt(2/n))
+      if v.bias then v.bias:zero() end
+   end
+end
+
+
 L_cnn = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
 L_cnn.weight:sub(2,-1):copy(mapWordIdx2Vector)
 
 cnn = nn.Sequential()
 cnn:add(L_cnn)
 if opt.dropout > 0 then
-   cnn:add(nn.Dropout(opt.dropout))
+--   cnn:add(nn.Dropout(opt.dropout))
 end
 if cudnnok then
    conv = cudnn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth, nil, 1)
@@ -69,6 +79,8 @@ if model then
    print("Model Size: ", parameters:size()[1])
    parametersClone = parameters:clone()
 end
+MSRinit(model)
+
 print(model)
 print(criterion)
 

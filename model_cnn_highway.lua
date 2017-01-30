@@ -1,5 +1,36 @@
 dofile('optim-rmsprop-single.lua')
---optnet = require 'optnet'
+optnet = require 'optnet'
+
+
+function shareGradInput(model)
+   local function sharingKey(m)
+      local key = torch.type(m)
+      if m.__shareGradInputKey then
+         key = key .. ':' .. m.__shareGradInputKey
+      end
+      return key
+   end
+
+   -- Share gradInput for memory efficient backprop
+   local cache = {}
+   model:apply(function(m)
+      local moduleType = torch.type(m)
+      if torch.isTensor(m.gradInput) and moduleType ~= 'nn.ConcatTable' then
+         local key = sharingKey(m)
+         if cache[key] == nil then
+            cache[key] = torch.CudaStorage(1)
+         end
+         m.gradInput = torch.CudaTensor(cache[key], 1, 0)
+      end
+   end)
+   for i, m in ipairs(model:findModules('nn.ConcatTable')) do
+      if cache[i % 2] == nil then
+         cache[i % 2] = torch.CudaStorage(1)
+      end
+      m.gradInput = torch.CudaTensor(cache[i % 2], 1, 0)
+   end
+end
+
 
 model = nn.Sequential()
 L_cnn = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
@@ -84,6 +115,12 @@ if model then
    parameters,gradParameters = model:getParameters()
    print("Model Size: ", parameters:size()[1])
    parametersClone = parameters:clone()
+   local sampleInput = torch.zeros(trainDataTensor:narrow(1, 1, opt.batchSize):size()):cuda()
+   optnet.optimizeMemory(model, sampleInput, {inplace=true, reuseBuffers=true, mode = 'training'})
+   shareGradInput(model)
+   model:apply(function(m)
+         if m.setMode then m:setMode(1, 1, 1) end
+      end)
 end
 print(model)
 print(criterion)
@@ -173,8 +210,9 @@ function train()
     shuffle = torch.randperm(batches)
     for t = 1,batches,1 do
         local begin = (shuffle[t] - 1)*bs + 1
-        local input = trainDataTensor:narrow(1, begin , bs) 
-        local target = trainDataTensor_y:narrow(1, begin , bs)
+        
+        local input = opt.dataoncpu and trainDataTensor:narrow(1, begin , bs):cuda() or trainDataTensor:narrow(1, begin , bs)
+        local target = opt.dataoncpu and trainDataTensor_y:narrow(1, begin , bs):cuda() or trainDataTensor_y:narrow(1, begin , bs)
         local input_lstm_fwd = trainDataTensor_lstm_fwd:narrow(1, begin , bs)
         local input_lstm_bwd = trainDataTensor_lstm_bwd:narrow(1, begin , bs)
       --  inputexp:copy(input)
@@ -236,15 +274,14 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
     local correct2 = 0
     local correct3 = 0
     local curr = -1
---    local inputexp = torch.CudaTensor():resizeAs(inputDataTensor:narrow(1, 1 ,opt.batchSize ))
---    optnet.optimizeMemory(model, inputexp, {inplace=true, reuseBuffers=true, mode="evaluation", removeGradParams=false})
+
     for t = 1,batches,1 do
         curr = t
         local begin = (t - 1)*bs + 1
-        local input = inputDataTensor:narrow(1, begin , bs)
+        local input = opt.dataoncpu and inputDataTensor:narrow(1, begin , bs):cuda() or inputDataTensor:narrow(1, begin , bs)
         local input_lstm_fwd = inputDataTensor_lstm_fwd:narrow(1, begin , bs)
         local input_lstm_bwd = inputDataTensor_lstm_bwd:narrow(1, begin , bs)
-   --     inputexp:copy(input)
+
         local pred        
         pred = model:forward(input)
    
