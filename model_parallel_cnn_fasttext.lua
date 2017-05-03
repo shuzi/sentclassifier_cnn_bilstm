@@ -1,54 +1,42 @@
 dofile('optim-rmsprop-single.lua')
 
-function MSRinit(model)
-   for k,v in pairs(model:findModules('cudnn.TemporalConvolution')) do
-      local n = v.kW*v.kH*v.nInputPlane
-      v.weight:normal(0,math.sqrt(2/n))
-      if v.bias then v.bias:zero() end
-   end
-end
-
-
-L_cnn = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
-L_cnn.weight:sub(2,-1):copy(mapWordIdx2Vector)
+embedding = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
+embedding.weight:sub(2,-1):copy(mapWordIdx2Vector)
 
 cnn = nn.Sequential()
-cnn:add(L_cnn)
-if opt.dropout > 0 then
---   cnn:add(nn.Dropout(opt.dropout))
-end
 if cudnnok then
-   conv = cudnn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth, nil, 1)
+   conv = cudnn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 elseif fbok then
    conv = nn.TemporalConvolutionFB(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 else
    conv = nn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 end
 cnn:add(conv)
-cnn:add(nn.ReLU())
-if cudnnok then
-   conv2 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, nil, 1)
-elseif fbok then
-   conv2 = nn.TemporalConvolutionFB(opt.numFilters, opt.numFilters, opt.contConvWidth)
-else
-   conv2 = nn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
+if opt.useACN then
+  cnn:add(nn.AddConstantNeg(-20000))
 end
-cnn:add(conv2)
-
-
---cnn:add(nn.AddConstantNeg(-20000))
-cnn:add(nn.ReLU())
 cnn:add(nn.Max(2))
-cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))
 if opt.lastReLU then
   cnn:add(nn.ReLU())
 else
   cnn:add(nn.Tanh())
 end
 
-model = nn.Sequential()
-model:add(cnn)
+fasttext = nn.Sequential()
+fasttext:add(nn.Mean(2))
+fasttext:add(nn.ReLU())
 
+parallel = nn.ConcatTable()
+parallel:add(cnn)
+parallel:add(fasttext)
+
+
+model = nn.Sequential()
+model:add(embedding)
+model:add(parallel)
+model:add(nn.JoinTable(2))
+model:add(nn.Linear(opt.numFilters + opt.embeddingDim, opt.hiddenDim))
+model:add(nn.ReLU())
 if opt.dropout > 0 then
   model:add(nn.Dropout(opt.dropout))
 end
@@ -78,8 +66,6 @@ if model then
    print("Model Size: ", parameters:size()[1])
    parametersClone = parameters:clone()
 end
-MSRinit(model)
-
 print(model)
 print(criterion)
 
@@ -180,11 +166,6 @@ function train()
                f = criterion:forward(output, target)
                local df_do = criterion:backward(output, target)
                model:backward(input, df_do)
-            else
-               local output = model:forward(input)
-               f = criterion:forward(output, target)
-               local df_do = criterion:backward(output, target)
-               model:backward(input, df_do) 
             end
             --cutorch.synchronize()
             if opt.L1reg ~= 0 then
@@ -198,7 +179,7 @@ function train()
                parametersClone:copy(parameters)
                gradParameters:add( parametersClone:mul(opt.L2reg) )
             end
-            gradParameters:clamp(-opt.gradClip, opt.gradClip)
+--           gradParameters:clamp(-opt.gradClip, opt.gradClip)
             return f,gradParameters
         end
 
@@ -229,11 +210,11 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
         curr = t
         local begin = (t - 1)*bs + 1
         local input = inputDataTensor:narrow(1, begin , bs)
-        local input_lstm_fwd = inputDataTensor_lstm_fwd:narrow(1, begin , bs)
-        local input_lstm_bwd = inputDataTensor_lstm_bwd:narrow(1, begin , bs)
         local pred        
-        pred = model:forward(input)
-   
+        if true then
+           pred = model:forward(input)
+        end
+        
         local prob, pos
         if opt.twoCriterion then
            prob, pos = torch.max(pred[1], 2)
@@ -246,13 +227,13 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
                 correct = correct + 1
                 break
             end
-          end
+          end 
           for k,v in ipairs(inputTarget[begin+m-1]) do
             if torch.abs(pos[m][1] - v) < 2 then
               correct2 = correct2 + 1
               break
             end
-          end 
+          end
           for k,v in ipairs(inputTarget[begin+m-1]) do
             if torch.abs(pos[m][1] - v) < 3 then
               correct3 = correct3 + 1
@@ -269,18 +250,14 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
        local input_lstm_bwd
        if opt.type == 'cuda' then
           input = torch.CudaTensor(bs, inputDataTensor:size(2)):zero()
-          input_lstm_fwd = torch.CudaTensor(bs, inputDataTensor_lstm_fwd:size(2)):zero()
-          input_lstm_bwd = torch.CudaTensor(bs, inputDataTensor_lstm_bwd:size(2)):zero()
        else
           input = torch.FloatTensor(bs, inputDataTensor:size(2)):zero()
-          input_lstm_fwd = torch.FloatTensor(bs, inputDataTensor_lstm_fwd:size(2)):zero()
-          input_lstm_bwd = torch.FloatTensor(bs, inputDataTensor_lstm_bwd:size(2)):zero()
        end
        input:narrow(1,1,rest_size):copy(inputDataTensor:narrow(1, curr*bs + 1, rest_size))
-       input_lstm_fwd:narrow(1,1,rest_size):copy(inputDataTensor_lstm_fwd:narrow(1, curr*bs + 1, rest_size))
-       input_lstm_bwd:narrow(1,1,rest_size):copy(inputDataTensor_lstm_bwd:narrow(1, curr*bs + 1, rest_size))
        local pred
-       pred = model:forward(input)
+       if true then
+           pred = model:forward(input)
+       end
 
        local prob, pos 
        if opt.twoCriterion then

@@ -1,72 +1,40 @@
 dofile('optim-rmsprop-single.lua')
 
-function MSRinit(model)
-   for k,v in pairs(model:findModules('cudnn.TemporalConvolution')) do
-      local n = v.kW*v.kH*v.nInputPlane
-      v.weight:normal(0,math.sqrt(2/n))
-      if v.bias then v.bias:zero() end
-   end
-end
-
-
-L_cnn = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
-L_cnn.weight:sub(2,-1):copy(mapWordIdx2Vector)
-
-cnn = nn.Sequential()
-cnn:add(L_cnn)
-if opt.dropout > 0 then
---   cnn:add(nn.Dropout(opt.dropout))
-end
-if cudnnok then
-   conv = cudnn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth, nil, 1)
-elseif fbok then
-   conv = nn.TemporalConvolutionFB(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
-else
-   conv = nn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
-end
-cnn:add(conv)
-cnn:add(nn.ReLU())
-if cudnnok then
-   conv2 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, nil, 1)
-elseif fbok then
-   conv2 = nn.TemporalConvolutionFB(opt.numFilters, opt.numFilters, opt.contConvWidth)
-else
-   conv2 = nn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
-end
-cnn:add(conv2)
-
-
---cnn:add(nn.AddConstantNeg(-20000))
-cnn:add(nn.ReLU())
-cnn:add(nn.Max(2))
-cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))
-if opt.lastReLU then
-  cnn:add(nn.ReLU())
-else
-  cnn:add(nn.Tanh())
-end
 
 model = nn.Sequential()
-model:add(cnn)
-
+embed = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
+embed.weight:sub(2,-1):copy(mapWordIdx2Vector)
+model:add(embed)
+model:add(cudnn.BLSTM(opt.embeddingDim, opt.bilstmOutputDim, 1, true))
+attention = nn.Sequential()
+attention:add(nn.Copy(nil,nil,true))
+attention:add(nn.TemporalConvolution(opt.bilstmOutputDim*2, opt.attention_da, 1))
+attention:add(nn.ReLU())
+attention:add(nn.TemporalConvolution(opt.attention_da, opt.attention_r, 1))
+attention:add(nn.Transpose({2,3}))
+attention:add(nn.View(opt.batchSize*opt.attention_r, -1))
+attention:add(nn.SoftMax())
+attention:add(nn.View(opt.batchSize, opt.attention_r, -1))
+part1 = nn.ConcatTable()
+part1:add(attention)
+part1:add(nn.Identity())
+model:add(part1)
+model:add(nn.MM())
+model:add(nn.View(opt.batchSize, opt.bilstmOutputDim*2*opt.attention_r))
+model:add(nn.ReLU())
+model:add(nn.Linear(opt.bilstmOutputDim*2*opt.attention_r, opt.finalLinearSize))
+if opt.lastReLU then
+  model:add(nn.ReLU())
+else
+  model:add(nn.Tanh())
+end
 if opt.dropout > 0 then
   model:add(nn.Dropout(opt.dropout))
 end
-model:add(nn.Linear(opt.hiddenDim, opt.numLabels))
+model:add(nn.Linear(opt.finalLinearSize, opt.numLabels))
 model:add(nn.LogSoftMax())
 
-if opt.twoCriterion then
-  prob_idx = nn.ConcatTable()
-  prob_idx:add(nn.Identity())
-  prob_idx:add(nn.ArgMax(2,opt.numLabels, false))
-  model:add(prob_idx)
-
-  nll = nn.ClassNLLCriterion()
-  abs = nn.AbsCriterion()
-  criterion = nn.ParallelCriterion(true):add(nll, opt.criterionWeight):add(abs)
-else
-  criterion = nn.ClassNLLCriterion()
-end
+criterion = nn.ClassNLLCriterion()
 
 
 if opt.type == 'cuda' then
@@ -78,8 +46,6 @@ if model then
    print("Model Size: ", parameters:size()[1])
    parametersClone = parameters:clone()
 end
-MSRinit(model)
-
 print(model)
 print(criterion)
 
@@ -175,17 +141,10 @@ function train()
             end
             gradParameters:zero()
             local f = 0
-            if true then
-               local output = model:forward(input)
-               f = criterion:forward(output, target)
-               local df_do = criterion:backward(output, target)
-               model:backward(input, df_do)
-            else
-               local output = model:forward(input)
-               f = criterion:forward(output, target)
-               local df_do = criterion:backward(output, target)
-               model:backward(input, df_do) 
-            end
+            local output = model:forward(input_lstm_fwd)
+            f = criterion:forward(output, target)
+            local df_do = criterion:backward(output, target)
+            model:backward(input_lstm_fwd, df_do) 
             --cutorch.synchronize()
             if opt.L1reg ~= 0 then
                local norm, sign = torch.norm, torch.sign
@@ -231,9 +190,11 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
         local input = inputDataTensor:narrow(1, begin , bs)
         local input_lstm_fwd = inputDataTensor_lstm_fwd:narrow(1, begin , bs)
         local input_lstm_bwd = inputDataTensor_lstm_bwd:narrow(1, begin , bs)
-        local pred        
-        pred = model:forward(input)
-   
+
+        local pred
+        pred = model:forward(input_lstm_fwd)
+        
+        
         local prob, pos
         if opt.twoCriterion then
            prob, pos = torch.max(pred[1], 2)
@@ -246,13 +207,13 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
                 correct = correct + 1
                 break
             end
-          end
+          end 
           for k,v in ipairs(inputTarget[begin+m-1]) do
             if torch.abs(pos[m][1] - v) < 2 then
               correct2 = correct2 + 1
               break
             end
-          end 
+          end
           for k,v in ipairs(inputTarget[begin+m-1]) do
             if torch.abs(pos[m][1] - v) < 3 then
               correct3 = correct3 + 1
@@ -280,7 +241,7 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
        input_lstm_fwd:narrow(1,1,rest_size):copy(inputDataTensor_lstm_fwd:narrow(1, curr*bs + 1, rest_size))
        input_lstm_bwd:narrow(1,1,rest_size):copy(inputDataTensor_lstm_bwd:narrow(1, curr*bs + 1, rest_size))
        local pred
-       pred = model:forward(input)
+       pred = model:forward(input_lstm_fwd)
 
        local prob, pos 
        if opt.twoCriterion then
@@ -325,5 +286,6 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
     print(string.format("Epoch %s Accuracy: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy, state.bestAccuracy, state.bestEpoch, sys.toc() ))
     print(string.format("Epoch %s Accuracy2: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy2, state.bestAccuracy2, state.bestEpoch2, sys.toc() ))
     print(string.format("Epoch %s Accuracy3: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy3, state.bestAccuracy3, state.bestEpoch3, sys.toc() ))
+    
 end
 

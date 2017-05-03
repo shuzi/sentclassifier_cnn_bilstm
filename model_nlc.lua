@@ -1,14 +1,5 @@
 dofile('optim-rmsprop-single.lua')
 
-function MSRinit(model)
-   for k,v in pairs(model:findModules('cudnn.TemporalConvolution')) do
-      local n = v.kW*v.kH*v.nInputPlane
-      v.weight:normal(0,math.sqrt(2/n))
-      if v.bias then v.bias:zero() end
-   end
-end
-
-
 L_cnn = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
 L_cnn.weight:sub(2,-1):copy(mapWordIdx2Vector)
 
@@ -18,7 +9,7 @@ if opt.dropout > 0 then
 --   cnn:add(nn.Dropout(opt.dropout))
 end
 if cudnnok then
-   conv = cudnn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth, nil, 1)
+   conv = cudnn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 elseif fbok then
    conv = nn.TemporalConvolutionFB(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 else
@@ -26,18 +17,7 @@ else
 end
 cnn:add(conv)
 cnn:add(nn.ReLU())
-if cudnnok then
-   conv2 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, nil, 1)
-elseif fbok then
-   conv2 = nn.TemporalConvolutionFB(opt.numFilters, opt.numFilters, opt.contConvWidth)
-else
-   conv2 = nn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
-end
-cnn:add(conv2)
-
-
 --cnn:add(nn.AddConstantNeg(-20000))
-cnn:add(nn.ReLU())
 cnn:add(nn.Max(2))
 cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))
 if opt.lastReLU then
@@ -48,10 +28,10 @@ end
 
 model = nn.Sequential()
 model:add(cnn)
-
-if opt.dropout > 0 then
+if opt.dropout> 0 then
   model:add(nn.Dropout(opt.dropout))
 end
+--model:add(cudnn.BatchNormalization(opt.hiddenDim + 2*opt.LSTMhiddenSize))
 model:add(nn.Linear(opt.hiddenDim, opt.numLabels))
 model:add(nn.LogSoftMax())
 
@@ -78,8 +58,6 @@ if model then
    print("Model Size: ", parameters:size()[1])
    parametersClone = parameters:clone()
 end
-MSRinit(model)
-
 print(model)
 print(criterion)
 
@@ -100,7 +78,7 @@ elseif opt.optimization == 'sgd' then
     optimState = {
       lr = opt.learningRate,
       lrd = opt.weightDecay,
-      mom = opt.momentum,
+      mom = opt.momentum
    }
    optimMethod = optim.msgd
 elseif opt.optimization == 'SGD' then
@@ -168,6 +146,7 @@ function train()
         local target = trainDataTensor_y:narrow(1, begin , bs)
         local input_lstm_fwd = trainDataTensor_lstm_fwd:narrow(1, begin , bs)
         local input_lstm_bwd = trainDataTensor_lstm_bwd:narrow(1, begin , bs)
+       
         
         local feval = function(x)
             if x ~= parameters then
@@ -324,6 +303,6 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
     if currAccuracy3 > state.bestAccuracy3 then state.bestAccuracy3 = currAccuracy3; state.bestEpoch3 = epoch end
     print(string.format("Epoch %s Accuracy: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy, state.bestAccuracy, state.bestEpoch, sys.toc() ))
     print(string.format("Epoch %s Accuracy2: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy2, state.bestAccuracy2, state.bestEpoch2, sys.toc() ))
-    print(string.format("Epoch %s Accuracy3: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy3, state.bestAccuracy3, state.bestEpoch3, sys.toc() ))
+    print(string.format("Epoch %s Accuracy3: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy3, state.bestAccuracy3, state.bestEpoch3, sys.toc() )) 
 end
 

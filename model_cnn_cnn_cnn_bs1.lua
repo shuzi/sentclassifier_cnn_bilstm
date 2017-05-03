@@ -1,22 +1,19 @@
 dofile('optim-rmsprop-single.lua')
 
-function MSRinit(model)
-   for k,v in pairs(model:findModules('cudnn.TemporalConvolution')) do
-      local n = v.kW*v.kH*v.nInputPlane
-      v.weight:normal(0,math.sqrt(2/n))
-      if v.bias then v.bias:zero() end
-   end
-end
-
-
 L_cnn = nn.LookupTableMaskZero(mapWordIdx2Vector:size()[1], opt.embeddingDim)
 L_cnn.weight:sub(2,-1):copy(mapWordIdx2Vector)
 
 cnn = nn.Sequential()
 cnn:add(L_cnn)
 if opt.dropout > 0 then
---   cnn:add(nn.Dropout(opt.dropout))
+   cnn:add(nn.Dropout(opt.dropout))
 end
+
+cnn:add(nn.Padding(0,1,opt.embeddingDim,0))
+cnn:add(nn.Narrow(1,1,1))
+
+
+
 if cudnnok then
    conv = cudnn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth, nil, 1)
 elseif fbok then
@@ -24,8 +21,12 @@ elseif fbok then
 else
    conv = nn.TemporalConvolution(opt.wordHiddenDim, opt.numFilters, opt.contConvWidth)
 end
+
 cnn:add(conv)
+
 cnn:add(nn.ReLU())
+cnn:add(nn.Padding(0,1,opt.numFilters,0))
+
 if cudnnok then
    conv2 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth, nil, 1)
 elseif fbok then
@@ -34,11 +35,26 @@ else
    conv2 = nn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
 end
 cnn:add(conv2)
+--cnn:add(nn.BatchNormalization(opt.numFilters))
+cnn:add(nn.Padding(0,1,opt.numFilters,0))
 
-
---cnn:add(nn.AddConstantNeg(-20000))
 cnn:add(nn.ReLU())
-cnn:add(nn.Max(2))
+--cnn:add(nn.TemporalMaxPooling(2))
+
+if cudnnok then
+   conv3 = cudnn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
+elseif fbok then
+   conv3 = nn.TemporalConvolutionFB(opt.numFilters, opt.numFilters, opt.contConvWidth)
+else
+   conv3 = nn.TemporalConvolution(opt.numFilters, opt.numFilters, opt.contConvWidth)
+end
+cnn:add(conv3)
+--cnn:add(nn.BatchNormalization(opt.numFilters))
+cnn:add(nn.Transpose({1,2}))
+cnn:add(nn.Normalize(2))
+cnn:add(nn.Transpose({1,2}))
+cnn:add(nn.ReLU())
+cnn:add(nn.Max(1))
 cnn:add(nn.Linear(opt.numFilters, opt.hiddenDim))
 if opt.lastReLU then
   cnn:add(nn.ReLU())
@@ -48,10 +64,8 @@ end
 
 model = nn.Sequential()
 model:add(cnn)
-
-if opt.dropout > 0 then
-  model:add(nn.Dropout(opt.dropout))
-end
+--model:add(nn.Dropout(0.5))
+--model:add(cudnn.BatchNormalization(opt.hiddenDim + 2*opt.LSTMhiddenSize))
 model:add(nn.Linear(opt.hiddenDim, opt.numLabels))
 model:add(nn.LogSoftMax())
 
@@ -78,8 +92,6 @@ if model then
    print("Model Size: ", parameters:size()[1])
    parametersClone = parameters:clone()
 end
-MSRinit(model)
-
 print(model)
 print(criterion)
 
@@ -159,21 +171,28 @@ function train()
 --    optimState.learningRate = opt.learningRate
     local time = sys.clock()
     model:training()
+    
+
     local batches = trainDataTensor:size()[1]/opt.batchSize
     local bs = opt.batchSize
     shuffle = torch.randperm(batches)
     for t = 1,batches,1 do
         local begin = (shuffle[t] - 1)*bs + 1
-        local input = trainDataTensor:narrow(1, begin , bs) 
+        local input = trainDataTensor:narrow(1, begin , bs):squeeze() 
+        local input_len = trainDataTensor_len:narrow(1, begin , bs)
         local target = trainDataTensor_y:narrow(1, begin , bs)
         local input_lstm_fwd = trainDataTensor_lstm_fwd:narrow(1, begin , bs)
         local input_lstm_bwd = trainDataTensor_lstm_bwd:narrow(1, begin , bs)
+        model:get(1):get(3).length=input_len[1]+1
+
+        
         
         local feval = function(x)
             if x ~= parameters then
                 parameters:copy(x)
             end
             gradParameters:zero()
+            
             local f = 0
             if true then
                local output = model:forward(input)
@@ -216,49 +235,45 @@ function train()
     print("\n==> time for 1 epoch = " .. (time) .. ' seconds')
 end
 
-function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bwd, inputTarget, state)
+function test(inputDataTensor, inputDataTensor_len, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bwd, inputTarget, state)
     local time = sys.clock()
     model:evaluate()
     local bs = opt.batchSizeTest
     local batches = inputDataTensor:size()[1]/bs
     local correct = 0
     local correct2 = 0
-    local correct3 = 0
     local curr = -1
     for t = 1,batches,1 do
         curr = t
         local begin = (t - 1)*bs + 1
-        local input = inputDataTensor:narrow(1, begin , bs)
+        local input = inputDataTensor:narrow(1, begin , bs):squeeze()
+        local input_len = inputDataTensor_len:narrow(1, begin , bs)
         local input_lstm_fwd = inputDataTensor_lstm_fwd:narrow(1, begin , bs)
         local input_lstm_bwd = inputDataTensor_lstm_bwd:narrow(1, begin , bs)
+        model:get(1):get(3).length=input_len[1]+1
         local pred        
         pred = model:forward(input)
    
         local prob, pos
+        
         if opt.twoCriterion then
            prob, pos = torch.max(pred[1], 2)
         else
-           prob, pos = torch.max(pred, 2)
+           prob, pos = torch.max(pred, 1)
         end
         for m = 1,bs do
           for k,v in ipairs(inputTarget[begin+m-1]) do
-            if pos[m][1] == v then
+            if pos[m] == v then
                 correct = correct + 1
                 break
             end
           end
           for k,v in ipairs(inputTarget[begin+m-1]) do
-            if torch.abs(pos[m][1] - v) < 2 then
+            if torch.abs(pos[m] - v) < 2 then
               correct2 = correct2 + 1
               break
             end
           end 
-          for k,v in ipairs(inputTarget[begin+m-1]) do
-            if torch.abs(pos[m][1] - v) < 3 then
-              correct3 = correct3 + 1
-              break
-            end
-          end
         end     
     end
 
@@ -301,12 +316,6 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
                 break
             end
           end
-          for k,v in ipairs(inputTarget[curr*bs+m]) do
-            if torch.abs(pos[m][1] - v) < 3 then
-                correct3 = correct3 + 1
-                break
-            end
-          end
        end
     end
      
@@ -314,16 +323,11 @@ function test(inputDataTensor, inputDataTensor_lstm_fwd, inputDataTensor_lstm_bw
     state.bestEpoch = state.bestEpoch or 0
     state.bestAccuracy2 = state.bestAccuracy2 or 0
     state.bestEpoch2 = state.bestEpoch2 or 0
-    state.bestAccuracy3 = state.bestAccuracy3 or 0
-    state.bestEpoch3 = state.bestEpoch3 or 0
     local currAccuracy = correct/(inputDataTensor:size()[1])
     local currAccuracy2 = correct2/(inputDataTensor:size()[1])
-    local currAccuracy3 = correct3/(inputDataTensor:size()[1])
     if currAccuracy > state.bestAccuracy then state.bestAccuracy = currAccuracy; state.bestEpoch = epoch end
     if currAccuracy2 > state.bestAccuracy2 then state.bestAccuracy2 = currAccuracy2; state.bestEpoch2 = epoch end
-    if currAccuracy3 > state.bestAccuracy3 then state.bestAccuracy3 = currAccuracy3; state.bestEpoch3 = epoch end
     print(string.format("Epoch %s Accuracy: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy, state.bestAccuracy, state.bestEpoch, sys.toc() ))
     print(string.format("Epoch %s Accuracy2: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy2, state.bestAccuracy2, state.bestEpoch2, sys.toc() ))
-    print(string.format("Epoch %s Accuracy3: %s, best Accuracy: %s on epoch %s at time %s", epoch, currAccuracy3, state.bestAccuracy3, state.bestEpoch3, sys.toc() ))
 end
 

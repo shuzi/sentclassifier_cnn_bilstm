@@ -188,6 +188,10 @@ elseif opt.model == 20 then
    dofile 'model_cnn_highway_nngraph.lua'
 elseif opt.model == 21 then
    dofile 'model_bilstmattn.lua'
+elseif opt.model == 22 then
+   dofile 'model_fasttext.lua'
+elseif opt.model == 23 then
+   dofile 'model_parallel_cnn_fasttext.lua'
 end
 collectgarbage()
 collectgarbage()
