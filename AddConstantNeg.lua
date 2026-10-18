@@ -1,5 +1,7 @@
 local AddConstantNeg, parent = torch.class('nn.AddConstantNeg', 'nn.Module')
 
+
+
 function AddConstantNeg:__init(constant_scalar, ip)
    parent.__init(self)
    assert(type(constant_scalar) == 'number', 'input is not scalar!')
